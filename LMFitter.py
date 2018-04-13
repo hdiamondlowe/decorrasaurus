@@ -37,7 +37,7 @@ class LMFitter(Talker, Writer):
         for n, night in enumerate(self.inputs.nightname):
             if 's'+str(n) in self.inputs.freeparamnames: self.inputs.freeparamnames.remove('s'+str(n))
 
-        self.speak('running first joint lmfit scaling by photon noise limits')#, making output txt file')
+        self.speak('running first lmfit scaling by photon noise limits')#, making output txt file')
 
         lmfitparams = lmfit.Parameters()
         for n, name in enumerate(self.inputs.freeparamnames):
@@ -50,7 +50,7 @@ class LMFitter(Talker, Writer):
 
         def lineareqn(params):
             paramvals = [params[name].value for name in self.inputs.freeparamnames]
-            model = ModelMakerJoint(self.inputs, self.wavebin, paramvals)
+            model = ModelMaker(self.inputs, self.wavebin, paramvals)
             return model.makemodel()
 
         def residuals1(params):
@@ -75,7 +75,7 @@ class LMFitter(Talker, Writer):
  
        # median absolute deviation sigma clipping to specified sigma value from inputs
         linfit1paramvals = [self.linfit1.params[name].value for name in self.inputs.freeparamnames]
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, linfit1paramvals)
+        modelobj = ModelMaker(self.inputs, self.wavebin, linfit1paramvals)
         models = modelobj.makemodel()
         for n, night in enumerate(self.inputs.nightname):
             resid = self.wavebin['lc'][n] - models[n]
@@ -133,7 +133,7 @@ class LMFitter(Talker, Writer):
             lmfitparams[name].set(min=minbound, max=maxbound)
 
         linfit2paramvals = [self.linfit2.params[name].value for name in self.inputs.freeparamnames]
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, linfit2paramvals)
+        modelobj = ModelMaker(self.inputs, self.wavebin, linfit2paramvals)
         models = modelobj.makemodel()
         data_uncs2 = []
         for n, night in enumerate(self.inputs.nightname):
@@ -162,7 +162,7 @@ class LMFitter(Talker, Writer):
             self.write('lmfit transit midpoint for {0}: {1}'.format(night, self.inputs.t0[n]))
 
         linfit3paramvals = [self.linfit3.params[name].value for name in self.inputs.freeparamnames]
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, linfit3paramvals)
+        modelobj = ModelMaker(self.inputs, self.wavebin, linfit3paramvals)
         models = modelobj.makemodel()
 
         resid = []
@@ -198,7 +198,7 @@ class LMFitter(Talker, Writer):
             return
         np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
 
-        plot = PlotterJoint(self.inputs, self.cube)
+        plot = Plotter(self.inputs, self.cube)
         plot.lmplots(self.wavebin, [self.linfit1, self.linfit2, self.linfit3])
 
         self.speak('done with lmfit for wavelength bin {0}'.format(self.wavefile))

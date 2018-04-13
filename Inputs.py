@@ -13,7 +13,6 @@ class Inputs(Talker):
         Talker.__init__(self)
 
         self.directories = directories
-        self.nightname = []
         #self.starlist = np.zeros(len(self.directories), dtype='S19')
 
         for n, subdir in enumerate(self.directories):
@@ -46,13 +45,11 @@ class Inputs(Talker):
             dictionary[key] = entries
 
 
-        self.nightname.append(dictionary['nightname'])
-        #self.starlist[self.n] = dictionary['starlist']
-
         if self.n == 0:
             self.speak('creating new detrender directory')
             self.speak('where possible, input values from {0} will be used'.format(self.subdir))
             self.filename = dictionary['filename']
+            self.nightname = [dictionary['nightname']]
 
 
             # create working folder for the files
@@ -67,6 +64,9 @@ class Inputs(Talker):
                 os.makedirs(directorypath+runpath)
 
             self.directoryname = directorypath+runpath
+
+        else: 
+            self.nightname.append(dictionary['nightname'])
         
         self.speak('copying {0} to directory {1}'.format(self.subdir+'/input.init', self.directoryname))
         copyfile(self.subdir+'/input.init', self.directoryname+self.nightname[self.n]+'_input.init')
@@ -112,8 +112,10 @@ class Inputs(Talker):
         if self.n == 0:
             self.filename = dictionary['filename']
             self.saveas = self.directoryname
+            self.nightname = [dictionary['nightname']]
 
-        self.nightname.append(dictionary['nightname'])
+        else:
+            self.nightname.append(dictionary['nightname'])
 
         # target and comparison list now designated in mosasaurus cube
         '''
