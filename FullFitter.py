@@ -23,10 +23,10 @@ class FullFitter(Talker, Writer):
 
         self.detrender = detrender
         self.inputs = self.detrender.inputs
-        self.cube = self.detrender.cube
+        self.subcube = self.detrender.cube.subcube
         self.wavefile = wavefile
         
-        Writer.__init__(self, self.inputs.saveas+'_'+self.wavefile+'.txt')
+        Writer.__init__(self, self.inputs.saveas+self.wavefile+'.txt')
 
         self.wavebin = np.load(self.inputs.saveas+'_'+self.wavefile+'.npy')[()]
         if 'mcfit' in self.wavebin.keys():
@@ -160,8 +160,8 @@ class FullFitter(Talker, Writer):
         self.wavebin['mcfit']['values'] = self.mcparams
         np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
 
-        plot = Plotter(self.inputs, self.cube)
-        plot.mcplots(self.wavebin)
+        plot = Plotter(self.inputs, self.subcube)
+        plot.fullplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
 
@@ -273,8 +273,8 @@ class FullFitter(Talker, Writer):
             self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n])))
         self.write('x median mean expected noise for fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n]) for n in range(len(self.inputs.nightname))])))
 
-        plot = Plotter(self.inputs, self.cube)
-        plot.mcplots(self.wavebin)
+        plot = Plotter(self.inputs, self.subcube)
+        plot.fullplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
 

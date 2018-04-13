@@ -20,9 +20,9 @@ class LMFitter(Talker, Writer):
         self.cube = self.detrender.cube
         self.wavefile = wavefile
         
-        Writer.__init__(self, self.inputs.saveas+'_'+self.wavefile+'.txt')
+        Writer.__init__(self, self.inputs.saveas+self.wavefile+'.txt')
 
-        self.wavebin = np.load(self.inputs.saveas+'_'+self.wavefile+'.npy')[()]
+        self.wavebin = np.load(self.inputs.saveas+self.wavefile+'.npy')[()]
         if 'lmfit' in self.wavebin.keys():
             self.speak('lmfit already exists for wavelength bin {0}'.format(self.wavefile))
         else: 
@@ -198,7 +198,7 @@ class LMFitter(Talker, Writer):
             return
         np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
 
-        plot = Plotter(self.inputs, self.cube)
+        plot = Plotter(self.inputs, self.cube.subcube)
         plot.lmplots(self.wavebin, [self.linfit1, self.linfit2, self.linfit3])
 
         self.speak('done with lmfit for wavelength bin {0}'.format(self.wavefile))

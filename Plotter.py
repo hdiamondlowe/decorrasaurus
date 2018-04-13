@@ -9,13 +9,65 @@ class Plotter(Talker):
 
     '''this class will plot all the things you wish to see'''
 
-    def __init__(self, inputs, cube):
+    def __init__(self, inputs, subcube):
         ''' initialize the plotter 
         directorypath is optional - it will be used by figures.py after detrender is finished '''
         Talker.__init__(self)
 
         self.inputs = inputs
-        self.cube = cube
+        self.subcube = subcube
+
+    def cubeplots(self):
+
+        self.speak('plotting raw counts vs wavelength for all stars')
+        colors = ['firebrick', 'darkorange', 'goldenrod', 'olivedrab', 'dodgerblue', 'darkmagenta']
+        for n, subdir in enumerate(self.inputs.subdirectories):      
+            target = self.subcube[n]['target']
+            comparisons = self.subcube[n]['comparisons']
+            expind = np.where(self.subcube[n]['airmass'] == min(self.subcube[n]['airmass']))[0][0] # use a low-airmass exposure
+            plt.plot(self.subcube[n]['wavelengths'], self.subcube[n]['raw_counts'][target][expind], alpha=0.75, lw=2, color=colors[n])
+            for comp in comparisons:
+                plt.plot(self.subcube[n]['wavelengths'], self.subcube[n]['raw_counts'][comp][expind], alpha=0.75, lw=2, color=colors[n])
+        plt.xlabel('wavelength (A)')
+        plt.ylabel('raw counts (photoelectrons)')
+        plt.tight_layout()
+        plt.savefig(self.inputs.saveas+'figure_rawspectra.png')
+        plt.clf()
+        plt.close()
+        
+
+    def lcplots(self, wavebin):
+
+        self.wavebin = wavebin
+        self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
+
+        self.speak('plotting light curve figures')
+
+        self.speak('plotting normalized rawcounts vs wavelength for all stars')
+        plt.figure()
+        for n, subdir in enumerate(self.inputs.subdirectories):
+            target = self.subcube[n]['target']
+            comparisons = self.subcube[n]['comparisons']
+            expind = np.where(self.subcube[n]['airmass'] == min(self.subcube[n]['airmass']))[0][0] # use the exposer at lowest airmass
+            bininds = self.wavebin['bininds'][n]
+
+            targcounts = self.subcube[n]['raw_counts'][target][expind]*bininds
+            where = np.where(targcounts)[0]
+            plt.plot(self.subcube[n]['wavelengths'], targcounts/np.median(targcounts[where]), alpha=0.75, lw=2, label=target)
+            print(self.subcube[n]['wavelengths'])
+            for comp in comparisons:
+                compcounts = self.subcube[n]['raw_counts'][comp][expind]*bininds
+                where = np.where(compcounts)
+                plt.plot(self.subcube[n]['wavelengths'], compcounts/np.median(compcounts[where]), alpha=0.75, lw=2, label=comp)
+            plt.legend(loc='best')
+            plt.xlabel('wavelength [angstroms]', fontsize=20)
+            plt.ylabel('normalized raw flux', fontsize=20)
+            plt.xlim(self.wavebin['wavelims'][0], self.wavebin['wavelims'][1])
+            plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
+            plt.tight_layout()
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedspectrum_'+self.inputs.nightname[n]+'.png')
+            plt.clf()
+            plt.close()
 
     def lmplots(self, wavebin, linfits):
 
@@ -38,12 +90,45 @@ class Plotter(Talker):
                 dtind = int(np.where(np.array(self.inputs.tranlabels[n]) == 'dt')[0])
                 t0.append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
 
-        self.speak('making lmfit detrended lightcurve with batman model vs time figure')
+
+        for n, subdir in enumerate(self.inputs.subdirectories):
+            self.speak('plotting normalized wavelength binned raw counts vs time for target and comparisons for {0}'.format(self.inputs.nightname[n]))
+            target, comparisons = self.subcube[n]['target'], self.subcube[n]['comparisons']
+            binnedtarg = np.sum(self.subcube[n]['raw_counts'][target] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]]
+            binnedcomp = np.array([np.sum(self.subcube[n]['raw_counts'][comparisons[i]] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]] for i in range(len(comparisons))])
+            plt.figure()
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
+            for i,c in enumerate(binnedcomp):
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], c/np.median(c), '.', alpha=0.5, label=comparisons[i])
+            plt.legend(loc='best')
+            plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
+            plt.ylabel('normalized flux', fontsize=20)
+            plt.tight_layout()
+            plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedtimeseries_'+self.inputs.nightname[n]+'.png')
+            plt.clf()
+            plt.close()
+
+            self.speak('plotting normalized wavelength binned raw counts vs time for target and summed comparisons for {0}'.format(self.inputs.nightname[n]))
+            plt.figure()
+            binnedsupercomp = np.sum(binnedcomp, 0)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedsupercomp/np.median(binnedsupercomp), '.', alpha=0.5, label='summedcomp')
+            plt.legend(loc='best')
+            plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
+            plt.ylabel('normalized nlux', fontsize=20)
+            plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
+            plt.tight_layout()
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedtimeseries_summedcomp_'+self.inputs.nightname[n]+'.png')
+            plt.clf()
+            plt.close()
+
+        self.speak('plotting lmfit detrended lightcurve with batman model vs time')
         plt.figure()
-        for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.cube.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', alpha=0.5)
-        for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.cube.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
+        for n, night in enumerate(self.inputs.subdirectories):
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', alpha=0.5)
+        for n, night in enumerate(self.inputs.subdirectories):
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
         plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
@@ -53,9 +138,9 @@ class Plotter(Talker):
         plt.close()
 
         
-        self.speak('making fit residual histogram figure')
+        self.speak('plotting fit residual histogram')
         dist = []
-        for n, night in enumerate(self.inputs.nightname):
+        for n, night in enumerate(self.inputs.subdirectories):
             resid = self.wavebin['lc'][n] - models[n]
             data_unc = np.std(resid)
             dist.append((self.wavebin['lc'][n] - models[n])/data_unc)
@@ -84,7 +169,7 @@ class Plotter(Talker):
 
         plt.close('all')
 
-    def mcplots(self, wavebin):
+    def fullplots(self, wavebin):
 
         self.wavebin = wavebin
         self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
@@ -93,7 +178,7 @@ class Plotter(Talker):
 
         if self.inputs.mcmccode == 'emcee':        
 
-            self.speak('making walkers vs steps figure')
+            self.speak('plotting walkers vs steps')
             fig, axes = plt.subplots(len(self.inputs.freeparamnames), 1, sharex=True, figsize=(16, 12))
             for i, name in enumerate(self.inputs.freeparamnames):
                 axes[i].plot(self.wavebin['mcfit']['chain'][:, :, i].T, color="k", alpha=0.4)
@@ -117,7 +202,7 @@ class Plotter(Talker):
             plt.close()
 
             
-            self.speak('making mcmc corner plot')
+            self.speak('plotting mcmc corner plot')
             samples = self.wavebin['mcfit']['chain'][:,self.inputs.burnin:,:].reshape((-1, len(self.inputs.freeparamnames)))
             fig = corner.corner(samples, labels=self.inputs.freeparamnames, truths=self.wavebin['lmfit']['values'])
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcmccorner.png')
@@ -154,12 +239,12 @@ class Plotter(Talker):
 
         modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
         models = modelobj.makemodel()
-        self.speak('making mcfit detrended lightcurve with batman model vs time figure')
+        self.speak('plotting mcfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.cube.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', alpha=0.5)
         for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.cube.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
         plt.title('mcfit for fit, '+self.wavefile+' angstroms', fontsize=20)

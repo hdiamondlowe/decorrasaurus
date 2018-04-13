@@ -1,19 +1,16 @@
-#import zachopy.Talker
-#Talker = zachopy.Talker.Talker
-#import numpy as np
 from .imports import *
-#import collections
+from .Plotter import Plotter
 from copy import deepcopy
 
 class CubeReader(Talker):
     ''' Reads in all the datacubes from the local subdirectories'''
-    def __init__(self, detrender, directories):
+    def __init__(self, detrender, subdirectories):
 
         Talker.__init__(self)
         
         self.detrender = detrender
         self.inputs = self.detrender.inputs
-        self.directories = directories
+        self.subdirectories = subdirectories
 
         try: 
             self.speak('trying to read in subcube')
@@ -21,14 +18,17 @@ class CubeReader(Talker):
             self.speak('loaded in subcube') 
         except(IOError):
             self.speak('subcube does not exist, creating a new one')
-            self.subcube = []
-            for n, subdir in enumerate(self.directories):
+            self.subcube = [] # make a list of subcubes for all nights involved
+            for n, subdir in enumerate(self.subdirectories):
                 self.n = n
                 self.subdir = subdir
                 self.datacubepath = self.inputs.datacubepath[self.n]
                 self.makeSubCube()
             np.save(self.inputs.saveas+'_subcube.npy', self.subcube)
             self.speak('subcube saved')
+
+            plot = Plotter(self.inputs, self.subcube)
+            plot.cubeplots()
 
     def makeSubCube(self):
 
@@ -62,48 +62,6 @@ class CubeReader(Talker):
         subcube['dcentroid'] = deepcopy(cube['cubes']['centroid'])     # [star](time, wave)
         subcube['dwidth'] = deepcopy(cube['cubes']['width'])           # [star](time, wave)
         subcube['peak'] = deepcopy(cube['cubes']['peak'])              # [star](time, wave)
-
-        '''
-        subcube['ok'] = ok
-        subcube['bjd'] = bjd
-        subcube['airmass'] = airmass
-        subcube['rotangle'] = rotangle
-        subcube['norm'] = norm
-        subcube['wavelengths'] = cube['spectral']['wavelength']       # (wave)
-        
-        # have to re-make these dictionaries
-        subcube['centroid'] = collections.defaultdict(dict)
-        subcube['width'] = collections.defaultdict(dict)
-        subcube['stretch'] = collections.defaultdict(dict)
-        subcube['shift'] = collections.defaultdict(dict)
-        subcube['raw_counts'] = collections.defaultdict(dict)
-        subcube['sky'] = collections.defaultdict(dict)
-        subcube['dcentroid'] = collections.defaultdict(dict)
-        subcube['dwidth'] = collections.defaultdict(dict)
-        subcube['peak'] = collections.defaultdict(dict)
-
-        subcube['centroid'][target] = centroid[target]
-        subcube['width'][target] = width[target]
-        subcube['stretch'][target] = stretch[target]
-        subcube['shift'][target] = shift[target]
-        subcube['raw_counts'][target] = raw_counts[target]
-        subcube['sky'][target] = sky[target]
-        subcube['dcentroid'][target] = dcentroid[target]
-        subcube['dwidth'][target] = dwidth[target]
-        subcube['peak'][target] = peak[target]
-        subcube['wavelengths'][target] = wavelengths[target]
-        for i in range(len(comparisons)):
-            subcube['centroid'][comparisons[i]] = centroid[comparisons[i]]
-            subcube['width'][comparisons[i]] = width[comparisons[i]]
-            subcube['stretch'][comparisons[i]] = stretch[comparisons[i]]
-            subcube['shift'][comparisons[i]] = shift[comparisons[i]]
-            subcube['raw_counts'][comparisons[i]] = raw_counts[comparisons[i]]
-            subcube['sky'][comparisons[i]] = sky[comparisons[i]]
-            subcube['dcentroid'][comparisons[i]] = dcentroid[comparisons[i]]
-            subcube['dwidth'][comparisons[i]] = dwidth[comparisons[i]]
-            subcube['peak'][comparisons[i]] = peak[comparisons[i]]
-            subcube['wavelengths'][comparisons[i]] = wavelengths[comparisons[i]]
-        '''
 
         self.subcube.append(subcube)
 

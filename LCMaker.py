@@ -1,9 +1,10 @@
 from .imports import *
 from .WaveBinner import WaveBinner
+from .Plotter import Plotter
 
 class LCMaker(Talker, Writer):
     '''LCMaker object trims the data in time and also creates light curves for each wavelength bin and saves them in their own .npy files.'''    
-    def __init__(self, detrender, directories):
+    def __init__(self, detrender, subdirectories):
         '''Initialize a LCMaker object.'''
 
         Talker.__init__(self)
@@ -12,9 +13,9 @@ class LCMaker(Talker, Writer):
         self.inputs = self.detrender.inputs
         self.cube = self.detrender.cube
         self.subcube = self.detrender.cube.subcube
-        self.directories = directories
+        self.subdirectories = subdirectories
 
-        for n, subdir in enumerate(self.directories):
+        for n, subdir in enumerate(self.subdirectories):
             self.n = n
             self.subdir = subdir
             self.trimTimeSeries()
@@ -31,7 +32,7 @@ class LCMaker(Talker, Writer):
 
     def makeBinnedLCs(self):
 
-        self.wavebin = WaveBinner(self.detrender, self.directories)
+        self.wavebin = WaveBinner(self.detrender, self.subdirectories)
 
         npyfiles = []
         for file in os.listdir(self.detrender.directoryname):
@@ -47,7 +48,7 @@ class LCMaker(Talker, Writer):
 
             else:
 
-                for n, subdir in enumerate(self.directories):
+                for n, subdir in enumerate(self.subdirectories):
                     self.n = n
                     self.subdir = subdir
 
@@ -82,7 +83,7 @@ class LCMaker(Talker, Writer):
 
                     # initiating writer for this particular wavelength bin output text file
                     if self.n == 0: 
-                        Writer.__init__(self, self.inputs.saveas+'_'+wavefile+'.txt')
+                        Writer.__init__(self, self.inputs.saveas+wavefile+'.txt')
                         # write a bunch of stuff that you may want easy access too (without loading in the .npy file)
                         self.write('output file for wavelength bin '+wavefile)
                         
@@ -113,7 +114,7 @@ class LCMaker(Talker, Writer):
                     raw_counts_comps = np.sum(np.sum([self.subcube[self.n]['raw_counts'][comparisons[i]] * bininds for i in range(len(comparisons))], 0), 1)
                     raw_counts_comps = raw_counts_comps/np.mean(raw_counts_comps)
 
-                    # make list of lightcurves and compcubes used for detrending for each night in directories
+                    # make list of lightcurves and compcubes used for detrending for each night in subdirectories
                     if self.n == 0: 
                         bin['lc'] = [(raw_counts_targ/np.mean(raw_counts_targ))[self.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.subcube[self.n]['ok']]]
                         bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
@@ -121,6 +122,11 @@ class LCMaker(Talker, Writer):
                         bin['lc'].append((raw_counts_targ/np.mean(raw_counts_targ))[self.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.subcube[self.n]['ok']])
                         bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
-                np.save(self.inputs.saveas+'_'+wavefile, bin)
+
+                np.save(self.inputs.saveas+wavefile, bin)
                 self.speak('saved dictionary for wavelength bin {0}'.format(wavefile))
+
+                # make plots
+                plot = Plotter(self.inputs, self.subcube)
+                plot.lcplots(bin)
 

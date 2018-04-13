@@ -71,59 +71,6 @@ class WaveBinner(Talker):
             # put this in the master binindices so that it can be used later for binning
             binindices[i] = indarray
             
-
-            #minwaveind = np.where(self.subcube[self.n]['wavelengths'] == np.ceil(wavelim[0]))[0][0]
-            #print(minwaveind)
-            #minwaveextra = minwaveind - wavelim[0]
-            #maxwaveind = int(np.floor(wavelim[1]))
-            #maxwaveextra = wavelim[1] - maxwaveind
-            #indarray = np.zeros(numwave)
-            #indarray[minwaveind:maxwaveind] = 1
-            #indarray[minwaveind-1] = minwaveextra
-            #indarray[maxwaveind] = maxwaveextra
-
-            #binindices[n][0][i] = indarray
-
-        
-        '''
-        #self.binnedcube_targ = np.zeros((numexps, self.numbins, numwave))
-        for n in range(numexps):
-            for i, wavelim in enumerate(self.wavelims):
-                  
-                minwave_interp1 = np.interp(wavelim[0], self.subcube[self.n]['wavelengths'][self.inputs.target[self.n]][self.inputs.targetpx[self.n]][n], starmaster['wavelength'])
-                minwave_interp = np.interp(minwave_interp1, starmaster['wavelength'], starmaster['w']) - starmaster['w'][0]
-                maxwave_interp1 = np.interp(wavelim[1], self.subcube[self.n]['wavelengths'][self.inputs.target[self.n]][self.inputs.targetpx[self.n]][n], starmaster['wavelength'])
-                maxwave_interp = np.interp(maxwave_interp1, starmaster['wavelength'], starmaster['w']) - starmaster['w'][0]
-                minwaveind = int(np.ceil(minwave_interp))
-                minwaveextra = minwaveind - minwave_interp
-                maxwaveind = int(np.floor(maxwave_interp))
-                maxwaveextra = maxwave_interp - maxwaveind
-                indarray = np.zeros((numwave))
-                indarray[minwaveind:maxwaveind] = 1
-                indarray[minwaveind-1] = minwaveextra
-                indarray[maxwaveind] = maxwaveextra
-
-                binindices[n][0][i] = indarray
-
-        for n in range(numexps):
-            for s in range(len(self.inputs.comparison[self.n])):
-                for i, wavelim in enumerate(self.wavelims):
-                      
-                    minwave_interp1 = np.interp(wavelim[0], self.subcube[self.n]['wavelengths'][self.inputs.comparison[self.n][s]][self.inputs.comparisonpx[self.n][s]][n], starmaster['wavelength'])
-                    minwave_interp = np.interp(minwave_interp1, starmaster['wavelength'], starmaster['w']) - starmaster['w'][0]
-                    maxwave_interp1 = np.interp(wavelim[1], self.subcube[self.n]['wavelengths'][self.inputs.comparison[self.n][s]][self.inputs.comparisonpx[self.n][s]][n], starmaster['wavelength'])
-                    maxwave_interp = np.interp(maxwave_interp1, starmaster['wavelength'], starmaster['w']) - starmaster['w'][0]
-                    minwaveind = int(np.ceil(minwave_interp))
-                    minwaveextra = minwaveind - minwave_interp
-                    maxwaveind = int(np.floor(maxwave_interp))
-                    maxwaveextra = maxwave_interp - maxwaveind
-                    indarray = np.zeros((numwave))
-                    indarray[minwaveind:maxwaveind] = 1
-                    indarray[minwaveind-1] = minwaveextra
-                    indarray[maxwaveind] = maxwaveextra
-
-                    binindices[n][s+1][i] = indarray
-        '''
         self.binindices.append(binindices)
 
         self.subcube[self.n]['wavebin'] = {}

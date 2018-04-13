@@ -7,15 +7,15 @@ import string
 #  an object that reads in an input.init file, stores all of the information, and also makes a copy of that file to the directory everything will get saved to
 class Inputs(Talker):
     '''InputsJoint object reads input.init information from all subdirectories and copies those files to the working detrender directry (if it's not already there).'''
-    def __init__(self, directories, *directoryname):
+    def __init__(self, subdirectories, *directoryname):
         '''Initialize an Inputs object.'''
 
         Talker.__init__(self)
 
-        self.directories = directories
+        self.subdirectories = subdirectories
         #self.starlist = np.zeros(len(self.directories), dtype='S19')
 
-        for n, subdir in enumerate(self.directories):
+        for n, subdir in enumerate(self.subdirectories):
             self.n = n
             self.subdir = subdir
             if directoryname:
