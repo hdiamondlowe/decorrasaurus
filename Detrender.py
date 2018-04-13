@@ -66,7 +66,7 @@ class Detrender(Talker, Writer):
                     Writer.__init__(self, self.inputs.saveas+'_'+wavefile+'.txt')
                     self.speak('mcfit will used a fixed rp/rs value of {0}'.format(self.inputs.tranparams[rpind]))
                     self.write('mcfit will used a fixed rp/rs value of {0}'.format(self.inputs.tranparams[rpind]))
-                self.mcfit = MCFitter(self, wavefile)
+                self.mcfit = FullFitter(self, wavefile)
 
 
         self.speak('decorrelation complete')

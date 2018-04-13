@@ -60,7 +60,7 @@ class FullFitter(Talker, Writer):
 
         #this is a hack to try to make emcee picklable, not sure this helps at all...
         def makemodellocal(inputs, wavebin, p):
-            modelobj = ModelMakerJoint(inputs, wavebin, p)
+            modelobj = ModelMaker(inputs, wavebin, p)
             return modelobj.makemodel()
 
         def lnlike(p, lcb, inputs, wavebin):
@@ -141,7 +141,7 @@ class FullFitter(Talker, Writer):
             self.write('mcfit transit midpoint for {0}: {1}'.format(night, self.inputs.t0[n]))
 
         #calculate rms from mcfit
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, self.mcparams[:,0])
+        modelobj = ModelMaker(self.inputs, self.wavebin, self.mcparams[:,0])
         models = modelobj.makemodel()
         resid = []
         for n in range(len(self.inputs.nightname)):
@@ -153,14 +153,14 @@ class FullFitter(Talker, Writer):
         # how many times the expected noise is the rms?
         for n, night in enumerate(self.inputs.nightname):
             self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n])))
-        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n]) for n in range(len(self.inputs.nightname))])))
+        self.write('x median mean expected noise for fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n]) for n in range(len(self.inputs.nightname))])))
 
 
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['mcfit']['values'] = self.mcparams
         np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
 
-        plot = PlotterJoint(self.inputs, self.cube)
+        plot = Plotter(self.inputs, self.cube)
         plot.mcplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
@@ -211,7 +211,7 @@ class FullFitter(Talker, Writer):
 
         # rescaling uncertainties as a free parameter during the fit (Berta, et al. 2011, references therein)
         def lnlike(p):
-            modelobj = ModelMakerJoint(self.inputs, self.wavebin, p)
+            modelobj = ModelMaker(self.inputs, self.wavebin, p)
             models = modelobj.makemodel()
             logl = []
             for n, night in enumerate(self.inputs.nightname):
@@ -259,7 +259,7 @@ class FullFitter(Talker, Writer):
             self.write('mcfit transit midpoint for {0}: {1}'.format(night, self.inputs.t0[n]))
 
         #calculate rms from mcfit
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, self.mcparams[:,0])
+        modelobj = ModelMaker(self.inputs, self.wavebin, self.mcparams[:,0])
         models = modelobj.makemodel()
         resid = []
         for n in range(len(self.inputs.nightname)):
@@ -271,9 +271,9 @@ class FullFitter(Talker, Writer):
         # how many times the expected noise is the rms?
         for n, night in enumerate(self.inputs.nightname):
             self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n])))
-        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n]) for n in range(len(self.inputs.nightname))])))
+        self.write('x median mean expected noise for fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n]) for n in range(len(self.inputs.nightname))])))
 
-        plot = PlotterJoint(self.inputs, self.cube)
+        plot = Plotter(self.inputs, self.cube)
         plot.mcplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))

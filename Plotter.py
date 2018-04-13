@@ -26,7 +26,7 @@ class Plotter(Talker):
 
         self.speak('making model to offset bjd times')
         #lcbinned = self.targcomp_binned.binned_lcs_dict[self.keys[k]]
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, self.wavebin['lmfit']['values'])
+        modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['lmfit']['values'])
         models = modelobj.makemodel()
 
         t0 = []
@@ -46,14 +46,14 @@ class Plotter(Talker):
             plt.plot(self.cube.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
-        plt.title('lmfit for joint fit, '+self.wavefile+' angstroms', fontsize=20)
+        plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
         #plt.tight_layout()
-        plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_lmfitdetrendedlc.png')
+        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
         plt.clf()
         plt.close()
 
         
-        self.speak('making joint fit residual histogram figure')
+        self.speak('making fit residual histogram figure')
         dist = []
         for n, night in enumerate(self.inputs.nightname):
             resid = self.wavebin['lc'][n] - models[n]
@@ -67,7 +67,7 @@ class Plotter(Talker):
         plt.xlabel('uncertainty-weighted residuals', fontsize=20)
         plt.ylabel('number of data points', fontsize=20)
         plt.legend()
-        plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_residuals_hist.png')
+        plt.savefig(self.inputs.saveas+self.wavefile+'_residuals_hist.png')
         plt.clf()
         plt.close()
 
@@ -77,7 +77,7 @@ class Plotter(Talker):
         plt.xlabel('data number')
         plt.ylabel('residuals')
         plt.legend(loc='best')
-        plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_linfit_residuals.png')
+        plt.savefig(self.inputs.saveas+self.wavefile+'_linfit_residuals.png')
         plt.clf()
         plt.close()
         
@@ -112,7 +112,7 @@ class Plotter(Talker):
                 if i == len(self.inputs.freeparamnames)-1: axes[i].set_xlabel("step number")
             fig.tight_layout()
             fig.subplots_adjust(hspace=0)
-            plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_mcmcchains.png')
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcmcchains.png')
             plt.clf()
             plt.close()
 
@@ -120,7 +120,7 @@ class Plotter(Talker):
             self.speak('making mcmc corner plot')
             samples = self.wavebin['mcfit']['chain'][:,self.inputs.burnin:,:].reshape((-1, len(self.inputs.freeparamnames)))
             fig = corner.corner(samples, labels=self.inputs.freeparamnames, truths=self.wavebin['lmfit']['values'])
-            plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_mcmccorner.png')
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcmccorner.png')
             plt.clf()
             plt.close()
 
@@ -131,7 +131,7 @@ class Plotter(Talker):
 
             # trace plot
             fig, axes = dyplot.traceplot(self.wavebin['mcfit']['results'], labels=self.inputs.freeparamnames, post_color='royalblue', truths=truths, truth_color='firebrick', truth_kwargs={'alpha': 0.8}, fig=plt.subplots(len(self.inputs.freeparamnames), 2, figsize=(12, 30)), trace_kwargs={'edgecolor':'none'})
-            plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_mcmcchains.png')
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcmcchains.png')
             plt.clf()
             plt.close()
 
@@ -152,7 +152,7 @@ class Plotter(Talker):
                 dtind = int(np.where(np.array(self.inputs.tranlabels[n]) == 'dt')[0])
                 t0.append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
 
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
+        modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
         models = modelobj.makemodel()
         self.speak('making mcfit detrended lightcurve with batman model vs time figure')
         plt.figure()
@@ -162,9 +162,9 @@ class Plotter(Talker):
             plt.plot(self.cube.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
-        plt.title('mcfit for joint fit, '+self.wavefile+' angstroms', fontsize=20)
+        plt.title('mcfit for fit, '+self.wavefile+' angstroms', fontsize=20)
         #plt.tight_layout()
-        plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_mcfitdetrendedlc.png')
+        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcfitdetrendedlc.png')
         plt.clf()
         plt.close()
 
