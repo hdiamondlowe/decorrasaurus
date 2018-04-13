@@ -92,7 +92,7 @@ class LMFitter(Talker, Writer):
             self.wavebin['photnoiseest'][n] = self.wavebin['photnoiseest'][n][newbinnedok]
             self.wavebin['compcube'][n] = self.cube.makeCompCube(self.wavebin['bininds'][n], n, self.wavebin['binnedok'][n])
             self.write('clipped points for {0}: {1}'.format(night, clip_start+clip_inds))
-            np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+            np.save(self.inputs.saveas+self.wavefile, self.wavebin)
             self.speak('remade lc and compcube for {0} in wavebin {1}'.format(night, self.wavefile))
 
 
@@ -196,7 +196,7 @@ class LMFitter(Talker, Writer):
         if not np.all(np.isfinite(np.array(self.wavebin['lmfit']['uncs']))): 
             self.speak('lmfit error: there were non-finite uncertainties')
             return
-        np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+        np.save(self.inputs.saveas+self.wavefile, self.wavebin)
 
         plot = Plotter(self.inputs, self.cube.subcube)
         plot.lmplots(self.wavebin, [self.linfit1, self.linfit2, self.linfit3])

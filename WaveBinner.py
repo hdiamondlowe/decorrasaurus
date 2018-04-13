@@ -27,7 +27,7 @@ class WaveBinner(Talker):
             else: 
                 self.makeBinIndices()
                 self.speak('saving wavebin properties to the subcube')
-                np.save(self.inputs.saveas+'_subcube.npy', self.subcube)
+                np.save(self.inputs.saveas+'subcube.npy', self.subcube)
 
 
     def makeBinIndices(self):

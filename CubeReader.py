@@ -24,11 +24,12 @@ class CubeReader(Talker):
                 self.subdir = subdir
                 self.datacubepath = self.inputs.datacubepath[self.n]
                 self.makeSubCube()
-            np.save(self.inputs.saveas+'_subcube.npy', self.subcube)
+            np.save(self.inputs.saveas+'subcube.npy', self.subcube)
             self.speak('subcube saved')
 
-            plot = Plotter(self.inputs, self.subcube)
-            plot.cubeplots()
+            if self.inputs.makeplots:
+                plot = Plotter(self.inputs, self.subcube)
+                plot.cubeplots()
 
     def makeSubCube(self):
 

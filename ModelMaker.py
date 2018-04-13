@@ -1,8 +1,8 @@
 #import zachopy.Talker
 #Talker = zachopy.Talker.Talker
 #import numpy as np
-from .imports import *
-from .BatmanLC import BatmanLC
+from imports import *
+from BatmanLC import BatmanLC
 #import astropy.units as u
 
 class ModelMaker(Talker):

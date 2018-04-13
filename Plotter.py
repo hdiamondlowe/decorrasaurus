@@ -41,9 +41,7 @@ class Plotter(Talker):
         self.wavebin = wavebin
         self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
 
-        self.speak('plotting light curve figures')
-
-        self.speak('plotting normalized rawcounts vs wavelength for all stars')
+        self.speak('plotting binned light curve')
         plt.figure()
         for n, subdir in enumerate(self.inputs.subdirectories):
             target = self.subcube[n]['target']
@@ -54,7 +52,6 @@ class Plotter(Talker):
             targcounts = self.subcube[n]['raw_counts'][target][expind]*bininds
             where = np.where(targcounts)[0]
             plt.plot(self.subcube[n]['wavelengths'], targcounts/np.median(targcounts[where]), alpha=0.75, lw=2, label=target)
-            print(self.subcube[n]['wavelengths'])
             for comp in comparisons:
                 compcounts = self.subcube[n]['raw_counts'][comp][expind]*bininds
                 where = np.where(compcounts)
@@ -91,37 +88,38 @@ class Plotter(Talker):
                 t0.append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
 
 
-        for n, subdir in enumerate(self.inputs.subdirectories):
-            self.speak('plotting normalized wavelength binned raw counts vs time for target and comparisons for {0}'.format(self.inputs.nightname[n]))
-            target, comparisons = self.subcube[n]['target'], self.subcube[n]['comparisons']
-            binnedtarg = np.sum(self.subcube[n]['raw_counts'][target] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]]
-            binnedcomp = np.array([np.sum(self.subcube[n]['raw_counts'][comparisons[i]] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]] for i in range(len(comparisons))])
-            plt.figure()
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
-            for i,c in enumerate(binnedcomp):
-                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], c/np.median(c), '.', alpha=0.5, label=comparisons[i])
-            plt.legend(loc='best')
-            plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
-            plt.ylabel('normalized flux', fontsize=20)
-            plt.tight_layout()
-            plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
-            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedtimeseries_'+self.inputs.nightname[n]+'.png')
-            plt.clf()
-            plt.close()
+        if self.inputs.makeplots:
+            for n, subdir in enumerate(self.inputs.subdirectories):
+                self.speak('plotting normalized wavelength binned raw counts vs time for target and comparisons for {0}'.format(self.inputs.nightname[n]))
+                target, comparisons = self.subcube[n]['target'], self.subcube[n]['comparisons']
+                binnedtarg = np.sum(self.subcube[n]['raw_counts'][target] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]]
+                binnedcomp = np.array([np.sum(self.subcube[n]['raw_counts'][comparisons[i]] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]] for i in range(len(comparisons))])
+                plt.figure()
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
+                for i,c in enumerate(binnedcomp):
+                    plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], c/np.median(c), '.', alpha=0.5, label=comparisons[i])
+                plt.legend(loc='best')
+                plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
+                plt.ylabel('normalized flux', fontsize=20)
+                plt.tight_layout()
+                plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
+                plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedtimeseries_'+self.inputs.nightname[n]+'.png')
+                plt.clf()
+                plt.close()
 
-            self.speak('plotting normalized wavelength binned raw counts vs time for target and summed comparisons for {0}'.format(self.inputs.nightname[n]))
-            plt.figure()
-            binnedsupercomp = np.sum(binnedcomp, 0)
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedsupercomp/np.median(binnedsupercomp), '.', alpha=0.5, label='summedcomp')
-            plt.legend(loc='best')
-            plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
-            plt.ylabel('normalized nlux', fontsize=20)
-            plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
-            plt.tight_layout()
-            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedtimeseries_summedcomp_'+self.inputs.nightname[n]+'.png')
-            plt.clf()
-            plt.close()
+                self.speak('plotting normalized wavelength binned raw counts vs time for target and summed comparisons for {0}'.format(self.inputs.nightname[n]))
+                plt.figure()
+                binnedsupercomp = np.sum(binnedcomp, 0)
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedsupercomp/np.median(binnedsupercomp), '.', alpha=0.5, label='summedcomp')
+                plt.legend(loc='best')
+                plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
+                plt.ylabel('normalized nlux', fontsize=20)
+                plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
+                plt.tight_layout()
+                plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedtimeseries_summedcomp_'+self.inputs.nightname[n]+'.png')
+                plt.clf()
+                plt.close()
 
         self.speak('plotting lmfit detrended lightcurve with batman model vs time')
         plt.figure()

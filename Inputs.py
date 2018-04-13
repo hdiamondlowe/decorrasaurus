@@ -1,4 +1,4 @@
-from .imports import *
+from imports import *
 from shutil import copyfile
 from datetime import datetime
 from astropy.table import Table
@@ -227,13 +227,10 @@ class Inputs(Talker):
             self.ldmodel = str_to_bool(dictionary['ldmodel'])
             self.domcmc = str_to_bool(dictionary['domcmc'])
 
-            #self.mastern = [dictionary['mastern']]
-            #self.starmasterstr = [dictionary['starmasterstr']+self.mastern[self.n]+'.npy']
+            self.makeplots = str_to_bool(dictionary['makeplots'])
 
             self.datacubepath = [dictionary['datacubepath']]
         else:
-            #self.mastern.append(dictionary['mastern'])
-            #self.starmasterstr.append(dictionary['starmasterstr']+self.mastern[self.n]+'.npy')
 
             self.datacubepath.append(dictionary['datacubepath'])
 
