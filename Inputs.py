@@ -118,26 +118,6 @@ class Inputs(Talker):
             self.nightname.append(dictionary['nightname'])
 
         # target and comparison list now designated in mosasaurus cube
-        '''
-        if self.n == 0:
-            self.target = []
-            self.targetpx = []
-            self.comparison = []
-            self.comparisonpx = []
-
-        self.starlist[self.n] = dictionary['starlist']
-        star = Table.read(self.directoryname+self.nightname[self.n]+'_'+self.starlist[self.n], format='ascii', delimiter='&')
-        comp, comppx = [], []
-        for s in star:
-            if s['star'] == 'targ': 
-                self.target.append(s['aperture'])
-                self.targetpx.append(s['extraction_window'])
-            elif s['star'] == 'comp':
-                comp.append(s['aperture'])
-                comppx.append(s['extraction_window'])
-        self.comparison.append(comp)
-        self.comparisonpx.append(comppx)
-        '''
 
         if self.n == 0:
             self.against = dictionary['against']
@@ -165,8 +145,6 @@ class Inputs(Talker):
         if self.n == 0:
             self.tranlabels = [dictionary['tranlabels']]
             self.tranparams = [[str_to_bool(i) for i in dictionary['tranparams']]]
-            try: self.fixedrp = str_to_bool(dictionary['fixedrp'])
-            except(TypeError): self.fixedrp = [str_to_bool(i) for i in dictionary['fixedrp']]
             self.tranbounds = [[[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]]
             self.wavelength_lims = [float(i) for i in dictionary['wavelength_lims']]
             if len(self.tranbounds[self.n][0]) != len(self.tranlabels[self.n]) or len(self.tranbounds[self.n][1]) != len(self.tranlabels[self.n]):
