@@ -114,6 +114,8 @@ class CubeReader(Talker):
         #subbinindices are of the format [numexps, numwave]
         self.subbinindices = subbinindices
         self.n = n
+        target = self.subcube[self.n]['target']
+        comparisons = self.subcube[self.n]['comparisons']
 
         if binnedok: self.binnedok = binnedok[0]
         else: self.binnedok = np.array([b for b in self.subcube[self.n]['ok']])
@@ -124,7 +126,9 @@ class CubeReader(Talker):
         self.compcube['bjd'] = self.subcube[self.n]['bjd'][self.binnedok]
         self.compcube['norm'] = self.subcube[self.n]['norm'][self.binnedok]
 
-        for key in ['airmass', 'rotangle', 'pwv']:
+        
+
+        for key in ['airmass', 'rotangle']:
             self.compcube[key] = (self.subcube[self.n][key][self.binnedok] - np.mean(self.subcube[self.n][key][self.binnedok]))/(np.std(self.subcube[self.n][key][self.binnedok]))
 
         if self.inputs.invvar: 
@@ -135,7 +139,11 @@ class CubeReader(Talker):
             den = np.sum((1./sig2), 0)
 
         for key in ['centroid', 'width', 'stretch', 'shift']:
-            keyarray = np.array([self.subcube[self.n][key][comparisons[i]][self.binnedok] for i in range(len(self.inputs.comparison[self.n]))])
+            # detrend against target or comparisons, as specified in inputs
+            if self.inputs.against == 'target': keyarray = np.array(self.subcube[self.n][key][target][self.binnedok])
+            elif self.inputs.against == 'comparisons': keyarray = np.array([self.subcube[self.n][key][comparisons[i]][self.binnedok] for i in range(len(comparisons))])
+            else: self.speak('you have not specified what to detrend against; must be target or comparisons')
+
             if self.inputs.invvar:
                 num = np.sum((keyarray/sig2), 0)
                 self.compcube[key] = num/den
@@ -144,7 +152,10 @@ class CubeReader(Talker):
                 self.compcube[key] = (summed - np.mean(summed))/np.std(summed)
 
         for key in ['raw_counts', 'sky', 'dcentroid', 'dwidth', 'peak']:
-            keyarray = np.array([np.sum(self.subcube[self.n][key][comparisons[i]] * self.subbinindices[:, i+1], 1)[self.binnedok] for i in range(len(self.inputs.comparison[self.n]))])
+            # detrend against target or comparisons, as specified in inputs
+            if self.inputs.against == 'target': self.keyarray = np.array((self.subcube[self.n][key][target] * self.subbinindices)[self.binnedok])
+            elif self.inputs.against == 'comparisons': self.keyarray = np.array([np.sum(self.subcube[self.n][key][comparisons[i]] * self.subbinindices, 1)[self.binnedok] for i in range(len(comparisons))])
+            else: self.speak('you have not specified what to detrend against; must be target or comparisons')
             if self.inputs.invvar:
                 num = np.sum((keyarray/sig2), 0)
                 self.compcube[key] = num/den

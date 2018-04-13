@@ -138,6 +138,7 @@ class Inputs(Talker):
         '''
 
         if self.n == 0:
+            self.against = dictionary['against']
             self.fitlabels = [dictionary['fitlabels']]
             if type(self.fitlabels[self.n]) == str: self.fitlabels[self.n] = [self.fitlabels[self.n]]
             self.polyfit = [int(dictionary['polyfit'])]

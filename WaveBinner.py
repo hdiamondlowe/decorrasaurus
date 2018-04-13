@@ -44,14 +44,48 @@ class WaveBinner(Talker):
             self.binlen = waverange/float(self.numbins)
             self.wavelims = []
             [self.wavelims.append((self.inputs.wavelength_lims[0]+(i*self.binlen), self.inputs.wavelength_lims[0]+((i+1)*self.binlen))) for i in range(int(self.numbins))]
-        binindices = np.zeros((numexps, int(len(self.subcube[self.n]['comparisons'])+1), self.numbins, numwave))
+        binindices = np.zeros((self.numbins, numwave))
 
-        #starmaster = np.load(self.inputs.starmasterstr[self.n])[()]
-
-        print(self.subcube[self.n]['wavelengths'].shape)
-        print(self.wavelims)
         for i, wavelim in enumerate(self.wavelims):
+            # make an array that will be a mask for the wavelength parameter; array of indices
+            indarray = np.zeros(numwave)
 
+            # round up minimum wavelim to nearest integer
+            minwaveroundup = int(np.ceil(wavelim[0]))
+            # find how much extra is needed in wavelength spave
+            minwaveextra = minwaveroundup - wavelim[0]
+            # find what wavelength integer corresponds to these
+            minwaveind = np.where(self.subcube[self.n]['wavelengths'] == minwaveroundup)[0][0]
+
+            # do the same for the maximum wavelim
+            maxwaverounddown = int(np.floor(wavelim[1]))
+            maxwaveextra = wavelim[1] - maxwaverounddown
+            maxwaveind = np.where(self.subcube[self.n]['wavelengths'] == maxwaverounddown)[0][0]
+
+            # set the hard wavelength bounds to 1
+            indarray[minwaveind:maxwaveind] = 1
+            # set the edges to the fractions to be included
+            indarray[minwaveind-1] = minwaveextra
+            indarray[maxwaveind] = maxwaveextra
+
+            # put this in the master binindices so that it can be used later for binning
+            binindices[i] = indarray
+            
+
+            #minwaveind = np.where(self.subcube[self.n]['wavelengths'] == np.ceil(wavelim[0]))[0][0]
+            #print(minwaveind)
+            #minwaveextra = minwaveind - wavelim[0]
+            #maxwaveind = int(np.floor(wavelim[1]))
+            #maxwaveextra = wavelim[1] - maxwaveind
+            #indarray = np.zeros(numwave)
+            #indarray[minwaveind:maxwaveind] = 1
+            #indarray[minwaveind-1] = minwaveextra
+            #indarray[maxwaveind] = maxwaveextra
+
+            #binindices[n][0][i] = indarray
+
+        
+        '''
         #self.binnedcube_targ = np.zeros((numexps, self.numbins, numwave))
         for n in range(numexps):
             for i, wavelim in enumerate(self.wavelims):
@@ -89,7 +123,7 @@ class WaveBinner(Talker):
                     indarray[maxwaveind] = maxwaveextra
 
                     binindices[n][s+1][i] = indarray
-
+        '''
         self.binindices.append(binindices)
 
         self.subcube[self.n]['wavebin'] = {}

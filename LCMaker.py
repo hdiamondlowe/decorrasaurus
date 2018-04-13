@@ -11,6 +11,7 @@ class LCMaker(Talker, Writer):
         self.detrender = detrender
         self.inputs = self.detrender.inputs
         self.cube = self.detrender.cube
+        self.subcube = self.detrender.cube.subcube
         self.directories = directories
 
         for n, subdir in enumerate(self.directories):
@@ -24,9 +25,9 @@ class LCMaker(Talker, Writer):
         # trim the light curves such that there is 1 transit duration on either side of the transit, and not more
         # Tdur needs to be in days
         self.speak('trimming excess baseline from {0}'.format(self.subdir))
-        outside_transit = np.where((self.cube.subcube[self.n]['bjd'] < self.inputs.t0[self.n]-(1.5*self.inputs.Tdur)) | (self.cube.subcube[self.n]['bjd'] > self.inputs.t0[self.n]+(1.5*self.inputs.Tdur)))
+        outside_transit = np.where((self.subcube[self.n]['bjd'] < self.inputs.t0[self.n]-(1.5*self.inputs.Tdur)) | (self.subcube[self.n]['bjd'] > self.inputs.t0[self.n]+(1.5*self.inputs.Tdur)))
         # !!! may have issue here when changing the midpoint time; may need to reset self.ok to all True and then add in time clip
-        self.cube.subcube[self.n]['ok'][outside_transit] = False
+        self.subcube[self.n]['ok'][outside_transit] = False
 
     def makeBinnedLCs(self):
 
@@ -40,8 +41,8 @@ class LCMaker(Talker, Writer):
         for w, wavefile in enumerate(self.wavebin.wavefiles):
 
             #file = self.inputs.nightname+'_'+str(wavelims[0])+'-'+str(wavelims[1])+'.npy'
-            if 'joint_'+wavefile+'.npy' in npyfiles: 
-                self.speak('joint_'+wavefile+' dictionary already exists in the detrender directory')
+            if wavefile+'.npy' in npyfiles: 
+                self.speak(wavefile+' dictionary already exists in the detrender directory')
                 pass
 
             else:
@@ -53,25 +54,28 @@ class LCMaker(Talker, Writer):
                     #basename = os.path.splitext(wavefile)[0][14:]
                     if self.n == 0: self.speak('creating dictionary for wavelength bin {0}'.format(wavefile))
 
-                    bininds = self.wavebin.binindices[self.n][:,:,w] # shape = (numexps, numstars, numwave)
+                    bininds = self.wavebin.binindices[self.n][w] # shape = (numexps, numstars, numwave)
                     # create a dictionary for this wavelength bin
                     if self.n == 0:
                         bin = {}
                         bin['freeparams'] = self.inputs.freeparamnames
                         bin['wavelims'] = self.wavebin.wavelims[w]
                         bin['bininds'] = [bininds]
-                        bin['binnedok'] = [np.array([b for b in self.cube.subcube[self.n]['ok']])]
+                        bin['binnedok'] = [np.array([b for b in self.subcube[self.n]['ok']])]
                     else:
                         bin['bininds'].append(bininds)
-                        bin['binnedok'].append(np.array([b for b in self.cube.subcube[self.n]['ok']]))
+                        bin['binnedok'].append(np.array([b for b in self.subcube[self.n]['ok']]))
 
                     if n == 0: self.speak('creating output txt file for '+wavefile)
 
+                    target = self.subcube[self.n]['target']
+                    comparisons = self.subcube[self.n]['comparisons']
+
                     # calculating photon noise limits
-                    raw_countsT = np.array(np.sum(self.cube.subcube[self.n]['raw_counts'][self.inputs.target[self.n]][self.inputs.targetpx[self.n]] * bininds[:,0], 1)[self.cube.subcube[self.n]['ok']])
-                    skyT = np.array(np.sum(self.cube.subcube[self.n]['sky'][self.inputs.target[self.n]][self.inputs.targetpx[self.n]] * bininds[:,0], 1)[self.cube.subcube[self.n]['ok']])
-                    raw_countsC = np.sum(np.array([np.sum(self.cube.subcube[self.n]['raw_counts'][self.inputs.comparison[self.n][i]][self.inputs.comparisonpx[self.n][i]] * bininds[:,i+1], 1)[self.cube.subcube[self.n]['ok']] for i in range(len(self.inputs.comparison[self.n]))]), 0)
-                    skyC = np.sum(np.array([np.sum(self.cube.subcube[self.n]['sky'][self.inputs.comparison[self.n][i]][self.inputs.comparisonpx[self.n][i]] * bininds[:,i+1], 1)[self.cube.subcube[self.n]['ok']] for i in range(len(self.inputs.comparison[self.n]))]), 0)
+                    raw_countsT = np.array(np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1)[self.subcube[self.n]['ok']])
+                    skyT = np.array(np.sum(self.subcube[self.n]['sky'][target] * bininds, 1)[self.subcube[self.n]['ok']])
+                    raw_countsC = np.sum(np.array([np.sum(self.subcube[self.n]['raw_counts'][comparisons[i]] * bininds, 1)[self.subcube[self.n]['ok']] for i in range(len(comparisons))]), 0)
+                    skyC = np.sum(np.array([np.sum(self.subcube[self.n]['sky'][comparisons[i]] * bininds, 1)[self.subcube[self.n]['ok']] for i in range(len(comparisons))]), 0)
                     sigmaT = np.sqrt(raw_countsT+skyT)/raw_countsT
                     sigmaC = np.sqrt(raw_countsC+skyC)/raw_countsC
                     sigmaF = np.sqrt(sigmaT**2 + sigmaC**2)
@@ -88,11 +92,8 @@ class LCMaker(Talker, Writer):
                         else: self.write('combining comparisons using: simple addition')
 
                     self.write('the following are parameters from subdirectory {0}'.format(self.subdir))
-                    self.write('    starlist file: '+self.inputs.starlist[self.n])
-                    self.write('    target: '+self.inputs.target[self.n])
-                    self.write('    targetpx: '+self.inputs.targetpx[self.n])
-                    self.write('    comparison: '+str(self.inputs.comparison[self.n]))
-                    self.write('    comparisonpx: '+str(self.inputs.comparisonpx[self.n]))
+                    self.write('    target: '+target)
+                    self.write('    comparison: '+str(comparisons))
 
                     self.write('    photon noise limits:')
                     self.write('        target               comparison           T/C')
@@ -107,17 +108,17 @@ class LCMaker(Talker, Writer):
                     else: bin['photnoiseest'].append(sigmaF)
 
                     # make a lightcurves to work off of
-                    raw_counts_targ = np.sum(self.cube.subcube[self.n]['raw_counts'][self.inputs.target[self.n]][self.inputs.targetpx[self.n]] * bininds[:,0], 1) # shape = (numexps)
+                    raw_counts_targ = np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1) # shape = (numexps)
                     raw_counts_targ = raw_counts_targ/np.mean(raw_counts_targ)
-                    raw_counts_comps = np.sum(np.sum([self.cube.subcube[self.n]['raw_counts'][self.inputs.comparison[self.n][i]][self.inputs.comparisonpx[self.n][i]] * bininds[:, i+1] for i in range(len(self.inputs.comparison[self.n]))], 0), 1)
+                    raw_counts_comps = np.sum(np.sum([self.subcube[self.n]['raw_counts'][comparisons[i]] * bininds for i in range(len(comparisons))], 0), 1)
                     raw_counts_comps = raw_counts_comps/np.mean(raw_counts_comps)
 
-                    # make list of lightcurves and compcubes used for detrending for each night in joint directories
+                    # make list of lightcurves and compcubes used for detrending for each night in directories
                     if self.n == 0: 
-                        bin['lc'] = [(raw_counts_targ/np.mean(raw_counts_targ))[self.cube.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.cube.subcube[self.n]['ok']]]
+                        bin['lc'] = [(raw_counts_targ/np.mean(raw_counts_targ))[self.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.subcube[self.n]['ok']]]
                         bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
                     else: 
-                        bin['lc'].append((raw_counts_targ/np.mean(raw_counts_targ))[self.cube.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.cube.subcube[self.n]['ok']])
+                        bin['lc'].append((raw_counts_targ/np.mean(raw_counts_targ))[self.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.subcube[self.n]['ok']])
                         bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
                 np.save(self.inputs.saveas+'_'+wavefile, bin)
