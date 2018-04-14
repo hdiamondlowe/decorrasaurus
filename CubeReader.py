@@ -14,7 +14,7 @@ class CubeReader(Talker):
 
         try: 
             self.speak('trying to read in subcube')
-            self.subcube = np.load(self.inputs.saveas+'_subcube.npy')[()]
+            self.subcube = np.load(self.inputs.saveas+'subcube.npy')[()]
             self.speak('loaded in subcube') 
         except(IOError):
             self.speak('subcube does not exist, creating a new one')

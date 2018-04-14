@@ -13,7 +13,6 @@ class Inputs(Talker):
         Talker.__init__(self)
 
         self.subdirectories = subdirectories
-        #self.starlist = np.zeros(len(self.directories), dtype='S19')
 
         for n, subdir in enumerate(self.subdirectories):
             self.n = n
