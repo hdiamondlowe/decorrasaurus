@@ -37,7 +37,7 @@ class RunReader(Talker, Writer):
     def setup(self):
         # read in inputs
 
-        # need the directory names as an input to Inputs; they actually won't get used...
+        # need the directory names as an input to Inputs
         self.subdirectories = [d for d in os.listdir('.') if os.path.isdir(os.path.join('.', d))]
         if 'run' in self.subdirectories: self.subdirectories.remove('run')
         self.subdirectories = sorted(self.subdirectories, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
@@ -49,8 +49,17 @@ class RunReader(Talker, Writer):
     def readrun(self):
         # create and populate a dictionary of run information
 
-        results = {}
+        results = []
+
+        # want array of depths and uncertainties
 
         # only need to read stuff in from the wavebin .npy files; don't bother putting subcube stuff inthere - it's aready loaded in!
+        for r in self.subdirectories:
+            result = {}
+            for w in self.subcube['wavebin']['wavefiles']:
+                binnedresult = np.load(self.rundirectory+w+'.npy'])[()]
+
+
+
 
 

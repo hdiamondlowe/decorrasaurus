@@ -203,27 +203,60 @@ class LMFitter(Talker, Writer):
 
         self.speak('done with lmfit for wavelength bin {0}'.format(self.wavefile))
 
-    def limbdarkparams(self, wavestart, waveend, teff=3270, teff_unc=104., 
-                            logg=5.06, logg_unc=0.20, z=-0.12, z_unc=0.15):
+    def limbdarkparams(self, wavestart, waveend):
         self.speak('using ldtk to derive limb darkening parameters')
         filters = BoxcarFilter('a', wavestart, waveend),     # Define passbands - Boxcar filters for transmission spectroscopy
-        sc = LDPSetCreator(teff=(teff, teff_unc),             # Define your star, and the code
-                           logg=(logg, logg_unc),             # downloads the uncached stellar 
-                              z=(z   , z_unc),                # spectra from the Husser et al.
+        sc = LDPSetCreator(teff=(self.inputs.Teff, self.inputs.Teff_unc),             # Define your star, and the code
+                           logg=(self.inputs.logg, self.inputs.logg_unc),             # downloads the uncached stellar 
+                              z=(self.inputs.z   , self.inputs.z_unc),                # spectra from the Husser et al.
                         filters=filters)                      # FTP server automatically.
 
         ps = sc.create_profiles()                             # Create the limb darkening profiles
-        u , u_unc = ps.coeffs_qd(do_mc=True)                  # Estimate non-linear law coefficients
-        self.u0, self.u1 = u[0][0], u[0][1]
-        self.write('limb darkening params: '+str(self.u0)+'  '+str(self.u1))
+        if self.inputs.ldlaw == 'sq': 
+            u , u_unc = ps.coeffs_sq(do_mc=True)                  # Estimate non-linear law coefficients
+            chains = np.array(ps._samples['sq'])
+            u0_array = chains[:,:,0]
+            u1_array = chains[:,:,1]
+        elif self.inputs.ldlaw == 'qd': 
+            u , u_unc = ps.coeffs_qd(do_mc=True)                  # Estimate non-linear law coefficients
+            chains = np.array(ps._samples['qd'])
+            u0_array = chains[:,:,0]
+            u1_array = chains[:,:,1]
+        else: 
+            self.speak('unknown limb-darkening law!')
+            return
+        #self.u0, self.u1 = u[0][0], u[0][1]
+        #self.u0_unc, self.u1_unc = u_unc[0][0], u_unc[0][1]
+        self.write('limb darkening params: '+str(u[0][0])+' +/- '+str(u_unc[0][0])+'    '+str(u[0][1])+' +/- '+str(u_unc[0][1]))
+
+        # re-parameterize the limb darkening parameters 
+        if self.inputs.ldlaw == 'sq':
+            self.v0_array = u0_array/3. + u1_array/5.
+            self.v1_array = u0_array/5. - u1_array/3.
+        elif self.inputs.ldlaw == 'qd':
+            self.v0_array = 2*u0_array + u1_array
+            self.v1_array = u0_array - 2*u1_array
+        self.v0, self.v1 = np.mean(self.v0_array), np.mean(self.v1_array)
+        self.v0_unc, self.v1_unc = np.std(self.v0_array), np.std(self.v1_array)
+        self.write('re-parameterized limb darkening params: '+str(self.v0)+' +/- '+str(self.v0_unc)+'    '+str(self.v1)+' +/- '+str(self.v1_unc))
+
+        # save the re-parameterized limb_darkening values so that they can be recalled when making the model
+        self.wavebin['ldparams'] = [[self.v0, self.v1], [self.v0_unc, self.v1_unc]]
+        np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+        self.speak('saved re-parameterized ld values and unertainties')
 
         for n in range(len(self.inputs.nightname)):
-            if 'u0' in self.inputs.tranlabels[n]:
-                self.inputs.tranparams[n][-2], self.inputs.tranparams[n][-1] = self.u0, self.u1
+            self.inputs.tranparams[n][-2], self.inputs.tranparams[n][-1] = self.v0, self.v1
+            # test uncorrelation of ld params - save original outputs from ldtk
+            #self.inputs.tranparams[n][-2], self.inputs.tranparams[n][-1] = u[0][0], u[0][1]
+            if self.inputs.tranbounds[n][0][-2] == False: continue
+            elif self.inputs.tranbounds[n][0][-2] == 'Joint': continue
             else:
-                # !Error! you also have to add to tranparambounds!
-                self.inputs.tranlabels[n].append('u0')
-                self.inputs.tranparams[n].append(self.u0)
-                self.inputs.tranlabels[n].append('u1')
-                self.inputs.tranparams[n].append(self.u1)
+                # put tight 1-sigma bounds on the re-parameterized limb darkening parameters; these will become Gaussian priors in the mcmc or dynesty sampling
+                self.inputs.tranbounds[n][0][-2], self.inputs.tranbounds[n][1][-2] = self.v0-self.v0_unc, self.v0+self.v0_unc
+                self.inputs.tranbounds[n][0][-1], self.inputs.tranbounds[n][1][-1] = self.v1-self.v1_unc, self.v1+self.v1_unc
+                u0ind = np.where(np.array(self.inputs.freeparamnames) == 'u0'+str(n))[0][0]
+                self.inputs.freeparambounds[0][u0ind], self.inputs.freeparambounds[1][u0ind] = self.v0-self.v0_unc, self.v0+self.v0_unc
+                self.inputs.freeparambounds[0][u0ind+1], self.inputs.freeparambounds[1][u0ind+1] = self.v1-self.v1_unc, self.v1+self.v1_unc
+
 
