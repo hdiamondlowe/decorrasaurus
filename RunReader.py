@@ -54,12 +54,14 @@ class RunReader(Talker, Writer):
         # want array of depths and uncertainties
 
         # only need to read stuff in from the wavebin .npy files; don't bother putting subcube stuff inthere - it's aready loaded in!
-        for r in self.subdirectories:
+        for n, subdir in enumerate(self.subdirectories):
             result = {}
-            for w in self.subcube['wavebin']['wavefiles']:
-                binnedresult = np.load(self.rundirectory+w+'.npy'])[()]
+            for w in self.subcube[n]['wavebin']['wavefiles']:
+                binnedresult = np.load(self.rundirectory+w+'.npy')[()]
 
 
 
+
+        return results
 
 

@@ -85,6 +85,7 @@ class LMFitter(Talker, Writer):
             clip_inds = np.where((resid > (self.inputs.sigclip*data_unc)) | (resid < (-self.inputs.sigclip*data_unc)))[0]
             clip_start = np.where(self.wavebin['binnedok'][n])[0][0]
             self.wavebin['binnedok'][n][clip_start + clip_inds] = False
+
             # need to update wavebin lc and compcube to reflect data clipping
             newbinnedok = np.ones(self.wavebin['lc'][n].shape, dtype=bool)
             newbinnedok[clip_inds] = False

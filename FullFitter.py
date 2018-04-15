@@ -25,10 +25,11 @@ class FullFitter(Talker, Writer):
         self.inputs = self.detrender.inputs
         self.subcube = self.detrender.cube.subcube
         self.wavefile = wavefile
+        self.savewave = self.inputs.saveas+self.wavefils
         
-        Writer.__init__(self, self.inputs.saveas+self.wavefile+'.txt')
+        Writer.__init__(self, self.savewave+'.txt')
 
-        self.wavebin = np.load(self.inputs.saveas+'_'+self.wavefile+'.npy')[()]
+        self.wavebin = np.load(self.savewave+'.npy')[()]
         if 'mcfit' in self.wavebin.keys():
             self.speak('mcfit already exists for wavelength bin {0}'.format(self.wavefile))
             if self.inputs.mcmccode == 'emcee':
@@ -111,7 +112,7 @@ class FullFitter(Talker, Writer):
                     self.wavebin['mcfit']['chain'] = np.append(self.wavebin['mcfit']['chain'], self.sampler.chain, axis=1)
                     self.speak('{0:5.1%}'.format(float(self.wavebin['mcfit']['chain'].shape[1])/self.inputs.nsteps))
                     self.speak('updating chain at step {0}'.format(self.wavebin['mcfit']['chain'].shape[1]))
-                    try: np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+                    try: np.save(self.savewave, self.wavebin)
                     except: 
                         self.speak('THERE WAS AN ERROR SAVING THE WAVEBIN')
                         return
@@ -158,17 +159,14 @@ class FullFitter(Talker, Writer):
 
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['mcfit']['values'] = self.mcparams
-        np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+        np.save(self.savewave, self.wavebin)
 
         plot = Plotter(self.inputs, self.subcube)
         plot.fullplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
 
-    def runMCFit_dynesty(self):
-
-        # reset this to 0 for every wavelength bin
-        self.inputs.batmanfac = 0
+    def runFullFit_dynesty(self):
 
         # limb darkening parameters were fixed in the Levenberg-Marquardt fits but now we want to fit for them
         if 'u00' in self.inputs.freeparamnames: pass
@@ -266,7 +264,7 @@ class FullFitter(Talker, Writer):
         self.wavebin['mcfit'] = {}
         self.wavebin['mcfit']['results'] = self.dsampler.results
         self.wavebin['mcfit']['values'] = self.mcparams
-        np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+        np.save(self.savewave, self.wavebin)
 
         self.write('mcmc params:')
         self.write('     parameter        value                  plus                  minus')
@@ -324,3 +322,5 @@ class FullFitter(Talker, Writer):
                 u0ind = np.where(np.array(self.inputs.freeparamnames) == 'u0'+str(n))[0][0]
                 self.inputs.freeparambounds[0][u0ind], self.inputs.freeparambounds[1][u0ind] = self.u0-(5.*self.u0_unc), self.u0+(5.*self.u0_unc)
                 self.inputs.freeparambounds[0][u0ind+1], self.inputs.freeparambounds[1][u0ind+1] = self.u1-(5.*self.u1_unc), self.u1+(5.*self.u1_unc)
+
+

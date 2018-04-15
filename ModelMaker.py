@@ -1,9 +1,5 @@
-#import zachopy.Talker
-#Talker = zachopy.Talker.Talker
-#import numpy as np
 from imports import *
 from BatmanLC import BatmanLC
-#import astropy.units as u
 
 class ModelMaker(Talker):
 
@@ -42,12 +38,29 @@ class ModelMaker(Talker):
             for t, tranlabel in enumerate(self.inputs.tranlabels[n]):
                 if tranlabel+str(n) in self.inputs.freeparamnames:
                     paramind = int(np.where(np.array(self.inputs.freeparamnames) == tranlabel+str(n))[0])
-                    values[tranlabel] = self.params[paramind]
+                    # need to reparameterize t0 u0 and u1
+                    if tranlabel == 'u0': 
+                        if self.inputs.ldlaw == 'sq': values[tranlabel] = (75./34.)*self.params[paramind] + (45./34.)*self.params[paramind+1]
+                        elif self.inputs.ldlaw == 'qd': values[tranlabel] = (2./5.)*self.params[paramind] + (1./5.)*self.params[paramind+1]
+                    elif tranlabel == 'u1': 
+                        if self.inputs.ldlaw == 'sq': values[tranlabel] = (45./34.)*self.params[paramind-1] - (75./34.)*self.params[paramind]
+                        elif self.inputs.ldlaw == 'qd': values[tranlabel] = (1./5.)*self.params[paramind-1] - (2./5.)*self.params[paramind]
+                    else: values[tranlabel] = self.params[paramind]
                 elif self.inputs.tranbounds[n][0][t] == 'Joint':
                     jointset = int(self.inputs.tranbounds[n][1][t])
                     paramind = int(np.where(np.array(self.inputs.freeparamnames) == tranlabel+str(jointset))[0])
-                    values[tranlabel] = self.params[paramind]
-                else: values[tranlabel] = self.inputs.tranparams[n][t]   
+                    #values[tranlabel] = self.params[paramind]
+                    values[tranlabel] = tranvalues[jointset][tranlabel]
+                else: 
+                    # need to reparameterize to u0 and u1 (these were set to v0 and v1 during the ldtkparams step of lmfitter
+                    if tranlabel == 'u0': 
+                        if self.inputs.ldlaw == 'sq': values[tranlabel] = (75./34.)*self.inputs.tranparams[n][t] + (45./34.)*self.inputs.tranparams[n][t+1]
+                        elif self.inputs.ldlaw == 'qd': values[tranlabel] = (2./5.)*self.inputs.tranparams[n][t] + (1./5.)*self.inputs.tranparams[n][t+1]
+                    elif tranlabel == 'u1': 
+                        if self.inputs.ldlaw == 'sq': values[tranlabel] = (45./34.)*self.inputs.tranparams[n][t-1] - (75./34.)*self.inputs.tranparams[n][t]
+                        elif self.inputs.ldlaw == 'qd': values[tranlabel] = (1./5.)*self.inputs.tranparams[n][t-1] - (2./5.)*self.inputs.tranparams[n][t]
+                    else: values[tranlabel] = self.inputs.tranparams[n][t]   
+                    #values[tranlabel] = self.inputs.tranparams[n][t]   
             tranvalues.append(values)
 
         #print [tranvalues[n]['dt'] for n in range(len(self.inputs.nightname))]
