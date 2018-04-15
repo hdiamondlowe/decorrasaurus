@@ -1,4 +1,4 @@
-from imports import *
+from .imports import *
 import astrotools.modeldepths as md
 import astropy.units as u
 from .ModelMaker import ModelMaker
@@ -31,8 +31,7 @@ class RunReader(Talker, Writer):
 
         # get set up to read the run in
         self.setup()
-
-        self.speak('run has been read in')
+        self.speak('run has been set up')
     
     def setup(self):
         # read in inputs
@@ -48,20 +47,53 @@ class RunReader(Talker, Writer):
 
     def readrun(self):
         # create and populate a dictionary of run information
-
-        results = []
+        self.speak('reading in run')
+        self.results = []
 
         # want array of depths and uncertainties
 
         # only need to read stuff in from the wavebin .npy files; don't bother putting subcube stuff inthere - it's aready loaded in!
         for n, subdir in enumerate(self.subdirectories):
             result = {}
+            # initiate dictionarly with freeparamnames
+            # need a way better way to do this - should have free parameters saved by night, not just some crazy long list of all free paramanames; more dictionaries...
+            for f in self.inputs.fitlabels[n]: result[f+str(n)] = []
+            for f in self.inputs.fitlabels[n]: result[f+str(n)+'_unc'] = []
+            result['dt'+str(n)] = []
+            result['dt'+str(n)+'_unc'] = []
+            result['rp'+str(n)] = []
+            result['rp'+str(n)+'_unc'] = []
+            result['wavelims'] = []
+            result['midwave'] = []
+            result['lightcurve'] = []
+            result['binnedok'] = []
+            result['fitmodel'] = []
+            result['batmanmodel'] = []
+
+            # only want to have to read in wavebins once
+            # something will have to happen in here when two instruments cover different wavebands
             for w in self.subcube[n]['wavebin']['wavefiles']:
                 binnedresult = np.load(self.rundirectory+w+'.npy')[()]
+                for i, p in enumerate(binnedresult['freeparams']):
+                    result[p].append(binnedresult['lmfit']['values'][i])
+                    result[p+'_unc'].append(binnedresult['lmfit']['uncs'][i])
+                result['wavelims'].append(binnedresult['wavelims'])
+                result['midwave'].append(np.mean(binnedresult['wavelims']))
+                result['lightcurve'].append(binnedresult['lc'])
+                result['binnedok'].append(binnedresult['binnedok'][n])
+                result['fitmodel'].append(binnedresult['fitmodel'][n])
+                result['batmanmodel'].append(binnedresult['batmanmodel'][n])
+                    
+            self.results.append(result)
 
+        self.speak('run has been read in')
 
+        # needed for transmission spec
+        # rp/rs, rp/rs unc, wavelims
 
-
-        return results
-
+        # needed for lightcurves
+        # what the free parameters are that went into the fit; inlcuding reparameterized limb darkening
+        # batman model and lightcurve model
+        # binnedok - for masking correct bjd point
+        
 

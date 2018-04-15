@@ -197,6 +197,8 @@ class LMFitter(Talker, Writer):
         if not np.all(np.isfinite(np.array(self.wavebin['lmfit']['uncs']))): 
             self.speak('lmfit error: there were non-finite uncertainties')
             return
+        self.wavebin['lmfit']['fitmodels'] = modelobj.fitmodel
+        self.wavebin['lmfit']['batmanmodels'] = modelobj.batmanmodel
         np.save(self.inputs.saveas+self.wavefile, self.wavebin)
 
         plot = Plotter(self.inputs, self.cube.subcube)
