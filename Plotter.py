@@ -121,12 +121,34 @@ class Plotter(Talker):
                 plt.clf()
                 plt.close()
 
+        self.speak('making lightcurve and lmfit model vs time figure')
+        plt.figure(figsize=(10, 10))
+        for n, subdir in enumerate(self.inputs.subdirectories):
+            gs = plt.matplotlib.gridspec.GridSpec(3, 1, hspace=0.15, wspace=0.15, left=0.08,right=0.98, bottom=0.07, top=0.92)
+            lcplots = {}
+            lcplots.setdefault('lcplusmodel', []).append(plt.subplot(gs[0:2,0]))
+            lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
+
+            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n], 'o', markeredgecolor='none', alpha=0.5)
+            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], models[n], 'k-', lw=2, alpha=0.5)
+            lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=20)
+
+            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]-models[n], 'o', alpha=0.5)
+            lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
+            lcplots['residuals'][0].set_xlabel('bjd-'+str(t0), fontsize=20)
+            lcplots['residuals'][0].set_ylabel('residuals', fontsize=20)
+
+            plt.suptitle(self.inputs.nightname[n]+'lightcurve plus lmfit model, '+self.wavefile+' angstroms')
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitlcplusmodel_'+self.inputs.nightname[n]+'.png')
+            plt.clf()
+            plt.close()
+
         self.speak('plotting lmfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, night in enumerate(self.inputs.subdirectories):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', markeredgecolor='none', alpha=0.5)
         for n, night in enumerate(self.inputs.subdirectories):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
         plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)

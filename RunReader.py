@@ -57,32 +57,39 @@ class RunReader(Talker, Writer):
             result = {}
             # initiate dictionarly with freeparamnames
             # need a way better way to do this - should have free parameters saved by night, not just some crazy long list of all free paramanames; more dictionaries...
-            for f in self.inputs.fitlabels[n]: result[f+str(n)] = []
-            for f in self.inputs.fitlabels[n]: result[f+str(n)+'_unc'] = []
-            result['dt'+str(n)] = []
-            result['dt'+str(n)+'_unc'] = []
-            result['rp'+str(n)] = []
-            result['rp'+str(n)+'_unc'] = []
+            for f in self.inputs.freeparamnames: result[f] = []
+            for f in self.inputs.freeparamnames: result[f+'_unc'] = []
             result['wavelims'] = []
             result['midwave'] = []
             result['lightcurve'] = []
             result['binnedok'] = []
             result['fitmodel'] = []
             result['batmanmodel'] = []
+            result['t0'] = []    
+
 
             # only want to have to read in wavebins once
             # something will have to happen in here when two instruments cover different wavebands
             for w in self.subcube[n]['wavebin']['wavefiles']:
                 binnedresult = np.load(self.rundirectory+w+'.npy')[()]
+                # this will not work when multiplt nights are involved - need to some how separate back into each night's values
                 for i, p in enumerate(binnedresult['freeparams']):
                     result[p].append(binnedresult['lmfit']['values'][i])
                     result[p+'_unc'].append(binnedresult['lmfit']['uncs'][i])
                 result['wavelims'].append(binnedresult['wavelims'])
                 result['midwave'].append(np.mean(binnedresult['wavelims']))
-                result['lightcurve'].append(binnedresult['lc'])
+                # these are night- and wave-dependent; only want 1 night in there at a time
+                result['lightcurve'].append(binnedresult['lc'][n])
                 result['binnedok'].append(binnedresult['binnedok'][n])
-                result['fitmodel'].append(binnedresult['fitmodel'][n])
-                result['batmanmodel'].append(binnedresult['batmanmodel'][n])
+                result['fitmodel'].append(binnedresult['lmfit']['fitmodels'][n])
+                result['batmanmodel'].append(binnedresult['lmfit']['batmanmodels'][n])
+
+                if 'dt'+str(n) in binnedresult['freeparams']:
+                    #dtind = int(np.where(np.array(binnedresultfreeparamnames) == 'dt'+str(n))[0])
+                    result['t0'].append(self.inputs.toff[n] + result['dt'+str(n)][-1])
+                else:
+                    dtind = int(np.where(np.array(self.inputs.tranlabels[n]) == 'dt')[0])
+                    result['t0'].append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
                     
             self.results.append(result)
 
