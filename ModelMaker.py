@@ -1,3 +1,5 @@
+
+
 from imports import *
 from BatmanLC import BatmanLC
 
@@ -69,9 +71,9 @@ class ModelMaker(Talker):
         if self.inputs.istarget == True and self.inputs.isasymm == False:
             self.batmanmodel = []
             for n, night in enumerate(self.inputs.nightname):
-                batman = BatmanLC(times=self.wavebin['compcube'][n]['bjd'], t0=self.inputs.toff[n]+tranvalues[n]['dt'], rp=tranvalues[n]['rp'], per=tranvalues[n]['per'], inc=tranvalues[n]['inc'], a=tranvalues[n]['a'], ecc=tranvalues[n]['ecc'], u0=tranvalues[n]['u0'], u1=tranvalues[n]['u1'])
+                batman = BatmanLC(times=self.wavebin['compcube'][n]['bjd'], t0=self.inputs.toff[n]+tranvalues[n]['dt'], rp=tranvalues[n]['rp'], per=tranvalues[n]['per'], inc=tranvalues[n]['inc'], a=tranvalues[n]['a'], ecc=tranvalues[n]['ecc'], omega=tranvalues[n]['omega'], u0=tranvalues[n]['u0'], u1=tranvalues[n]['u1'], ldlaw=self.inputs.ldlaw)#, batmanfac=self.inputs.batmanfac)
                 batmanmodel = batman.batman_model()
-                if np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
+                if n == 0 and np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
                 self.batmanmodel.append(batmanmodel)
         if self.inputs.istarget == True and self.inputs.isasymm == True:
             rp, tau0, tau1, tau2 = [], [], [], []

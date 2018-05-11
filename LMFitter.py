@@ -19,10 +19,11 @@ class LMFitter(Talker, Writer):
         self.inputs = self.detrender.inputs
         self.cube = self.detrender.cube
         self.wavefile = wavefile
+        self.savewave = self.inputs.saveas+self.wavefile
         
-        Writer.__init__(self, self.inputs.saveas+self.wavefile+'.txt')
+        Writer.__init__(self, self.savewave+'.txt')
 
-        self.wavebin = np.load(self.inputs.saveas+self.wavefile+'.npy')[()]
+        self.wavebin = np.load(self.savewave+'.npy')[()]
         if 'lmfit' in self.wavebin.keys():
             self.speak('lmfit already exists for wavelength bin {0}'.format(self.wavefile))
         else: 
@@ -93,7 +94,7 @@ class LMFitter(Talker, Writer):
             self.wavebin['photnoiseest'][n] = self.wavebin['photnoiseest'][n][newbinnedok]
             self.wavebin['compcube'][n] = self.cube.makeCompCube(self.wavebin['bininds'][n], n, self.wavebin['binnedok'][n])
             self.write('clipped points for {0}: {1}'.format(night, clip_start+clip_inds))
-            np.save(self.inputs.saveas+self.wavefile, self.wavebin)
+            np.save(self.savewave, self.wavebin)
             self.speak('remade lc and compcube for {0} in wavebin {1}'.format(night, self.wavefile))
 
 
@@ -199,7 +200,7 @@ class LMFitter(Talker, Writer):
             return
         self.wavebin['lmfit']['fitmodels'] = modelobj.fitmodel
         self.wavebin['lmfit']['batmanmodels'] = modelobj.batmanmodel
-        np.save(self.inputs.saveas+self.wavefile, self.wavebin)
+        np.save(self.savewave, self.wavebin)
 
         plot = Plotter(self.inputs, self.cube.subcube)
         plot.lmplots(self.wavebin, [self.linfit1, self.linfit2, self.linfit3])
@@ -245,7 +246,7 @@ class LMFitter(Talker, Writer):
 
         # save the re-parameterized limb_darkening values so that they can be recalled when making the model
         self.wavebin['ldparams'] = [[self.v0, self.v1], [self.v0_unc, self.v1_unc]]
-        np.save(self.inputs.saveas+'_'+self.wavefile, self.wavebin)
+        np.save(self.savewave, self.wavebin)
         self.speak('saved re-parameterized ld values and unertainties')
 
         for n in range(len(self.inputs.nightname)):

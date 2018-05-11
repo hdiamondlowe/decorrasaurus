@@ -139,6 +139,7 @@ class Inputs(Talker):
             self.inc = float(dictionary['inc'])
             self.a = float(dictionary['a'])
             self.ecc = float(dictionary['ecc'])
+            self.omega = float(dictionary['omega'])
             self.epochnum = [int(dictionary['epochnum'])]
             self.toff = [self.T0 + self.P*self.epochnum[self.n]]
 

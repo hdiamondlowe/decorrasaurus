@@ -60,6 +60,7 @@ class WaveBinner(Talker):
             # do the same for the maximum wavelim
             maxwaverounddown = int(np.floor(wavelim[1]))
             maxwaveextra = wavelim[1] - maxwaverounddown
+
             maxwaveind = np.where(self.subcube[self.n]['wavelengths'] == maxwaverounddown)[0][0]
 
             # set the hard wavelength bounds to 1

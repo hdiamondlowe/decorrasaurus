@@ -55,8 +55,8 @@ class CubeReader(Talker):
         # have to re-make these dictionaries
         subcube['centroid'] = deepcopy(cube['squares']['centroid'])    # [star](time)
         subcube['width'] = deepcopy(cube['squares']['width'])          # [star](time)
-        subcube['stretch'] = deepcopy(cube['squares']['stretch'])      # [star](time)
-        subcube['shift'] = deepcopy(cube['squares']['shift'])          # [star](time)
+        #subcube['stretch'] = deepcopy(cube['squares']['stretch'])      # [star](time)
+        #subcube['shift'] = deepcopy(cube['squares']['shift'])          # [star](time)
 
         subcube['raw_counts'] = deepcopy(cube['cubes']['raw_counts'])  # [star](time, wave)
         subcube['sky'] = deepcopy(cube['cubes']['sky'])                # [star](time, wave)
@@ -97,7 +97,7 @@ class CubeReader(Talker):
             sig2 = raw_counts_comps + sky_counts_comps
             den = np.sum((1./sig2), 0)
 
-        for key in ['centroid', 'width', 'stretch', 'shift']:
+        for key in ['centroid', 'width']: #, 'stretch', 'shift']:
             # detrend against target or comparisons, as specified in inputs
             if self.inputs.against == 'target': keyarray = np.array(self.subcube[self.n][key][target][self.binnedok])
             elif self.inputs.against == 'comparisons': keyarray = np.array([self.subcube[self.n][key][comparisons[i]][self.binnedok] for i in range(len(comparisons))])

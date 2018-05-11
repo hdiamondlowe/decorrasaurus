@@ -66,6 +66,7 @@ class RunReader(Talker, Writer):
             result['fitmodel'] = []
             result['batmanmodel'] = []
             result['t0'] = []    
+            result['photnoiseest'] = []
 
 
             # only want to have to read in wavebins once
@@ -83,6 +84,7 @@ class RunReader(Talker, Writer):
                 result['binnedok'].append(binnedresult['binnedok'][n])
                 result['fitmodel'].append(binnedresult['lmfit']['fitmodels'][n])
                 result['batmanmodel'].append(binnedresult['lmfit']['batmanmodels'][n])
+                result['photnoiseest'].append(binnedresult['photnoiseest'][n])
 
                 if 'dt'+str(n) in binnedresult['freeparams']:
                     #dtind = int(np.where(np.array(binnedresultfreeparamnames) == 'dt'+str(n))[0])
