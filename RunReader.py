@@ -74,6 +74,7 @@ class RunReader(Talker, Writer):
             for w in self.subcube[n]['wavebin']['wavefiles']:
                 binnedresult = np.load(self.rundirectory+w+'.npy')[()]
                 # this will not work when multiplt nights are involved - need to some how separate back into each night's values
+                print(binnedresult['freeparams'])
                 for i, p in enumerate(binnedresult['freeparams']):
                     result[p].append(binnedresult['lmfit']['values'][i])
                     result[p+'_unc'].append(binnedresult['lmfit']['uncs'][i])

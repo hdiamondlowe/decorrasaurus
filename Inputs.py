@@ -188,6 +188,7 @@ class Inputs(Talker):
                 self.freeparambounds[1].append(self.tranbounds[self.n][1][t])
                 self.freeparamnames.append(tlabel+str(self.n))
                 self.freeparamvalues.append(self.tranparams[self.n][t])
+            
 
             dtind = int(np.where(np.array(self.tranlabels[self.n]) == 'dt')[0])
             self.t0 = [self.toff[self.n] + self.tranparams[self.n][dtind]]
@@ -220,7 +221,7 @@ class Inputs(Talker):
 
             dtind = int(np.where(np.array(self.tranlabels[self.n]) == 'dt')[0])
             self.t0.append(self.toff[self.n] + self.tranparams[self.n][dtind])
-        
+
         if self.n == 0:
             self.binlen = str_to_bool(dictionary['binlen'])
             self.sigclip = float(dictionary['sigclip'])
