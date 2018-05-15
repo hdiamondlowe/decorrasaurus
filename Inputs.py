@@ -225,6 +225,8 @@ class Inputs(Talker):
         if self.n == 0:
             self.binlen = str_to_bool(dictionary['binlen'])
             self.sigclip = float(dictionary['sigclip'])
+            try: self.midclip_inds = [str_to_bool(dictionary['midclip_inds'])]
+            except(TypeError): self.midclip_inds = [[int(i) for i in dictionary['midclip_inds']]]
 
             self.mcmccode = dictionary['mcmccode']
             
@@ -245,7 +247,11 @@ class Inputs(Talker):
             self.makeplots = str_to_bool(dictionary['makeplots'])
 
             self.datacubepath = [dictionary['datacubepath']]
+        
         else:
+
+            try: self.midclip_inds.append(str_to_bool(dictionary['midclip_inds']))
+            except(TypeError): self.midclip_inds.append([int(i) for i in dictionary['midclip_inds']])
 
             self.datacubepath.append(dictionary['datacubepath'])
 

@@ -19,6 +19,7 @@ class LCMaker(Talker, Writer):
             self.n = n
             self.subdir = subdir
             self.trimTimeSeries()
+            self.maskStarSpot()
         self.makeBinnedLCs()
 
     def trimTimeSeries(self):
@@ -29,6 +30,14 @@ class LCMaker(Talker, Writer):
         outside_transit = np.where((self.subcube[self.n]['bjd'] < self.inputs.t0[self.n]-(1.5*self.inputs.Tdur)) | (self.subcube[self.n]['bjd'] > self.inputs.t0[self.n]+(1.5*self.inputs.Tdur)))
         # !!! may have issue here when changing the midpoint time; may need to reset self.ok to all True and then add in time clip
         self.subcube[self.n]['trimmedok'][outside_transit] = False
+
+    def maskStarSpot(self):
+
+        if self.inputs.midclip_inds[self.n] == False: pass
+        else: 
+            self.speak('trimming points from the middle of {0}'.format(self.subdir))
+            ind0, ind1 = self.inputs.midclip_inds[self.n][0], self.inputs.midclip_inds[self.n][1]
+            self.subcube[self.n]['trimmedok'][ind0:ind1] = False
 
     def makeBinnedLCs(self):
 
