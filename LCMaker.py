@@ -28,7 +28,7 @@ class LCMaker(Talker, Writer):
         self.speak('trimming excess baseline from {0}'.format(self.subdir))
         outside_transit = np.where((self.subcube[self.n]['bjd'] < self.inputs.t0[self.n]-(1.5*self.inputs.Tdur)) | (self.subcube[self.n]['bjd'] > self.inputs.t0[self.n]+(1.5*self.inputs.Tdur)))
         # !!! may have issue here when changing the midpoint time; may need to reset self.ok to all True and then add in time clip
-        self.subcube[self.n]['ok'][outside_transit] = False
+        self.subcube[self.n]['trimmedok'][outside_transit] = False
 
     def makeBinnedLCs(self):
 
@@ -62,10 +62,10 @@ class LCMaker(Talker, Writer):
                         bin['freeparams'] = self.inputs.freeparamnames
                         bin['wavelims'] = self.wavebin.wavelims[w]
                         bin['bininds'] = [bininds]
-                        bin['binnedok'] = [np.array([b for b in self.subcube[self.n]['ok']])]
+                        bin['binnedok'] = [self.subcube[self.n]['mosasaurusok'] * self.subcube[self.n]['trimmedok']] # initially all bad points by wavelength are the same; union of mosasaurusok and trimmed ok points
                     else:
                         bin['bininds'].append(bininds)
-                        bin['binnedok'].append(np.array([b for b in self.subcube[self.n]['ok']]))
+                        bin['binnedok'].append(self.subcube[self.n]['mosasaurusok'] * self.subcube[self.n]['trimmedok'])
 
                     if n == 0: self.speak('creating output txt file for '+wavefile)
 
@@ -73,10 +73,10 @@ class LCMaker(Talker, Writer):
                     comparisons = self.subcube[self.n]['comparisons']
 
                     # calculating photon noise limits
-                    raw_countsT = np.array(np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1)[self.subcube[self.n]['ok']])
-                    skyT = np.array(np.sum(self.subcube[self.n]['sky'][target] * bininds, 1)[self.subcube[self.n]['ok']])
-                    raw_countsC = np.sum(np.array([np.sum(self.subcube[self.n]['raw_counts'][comparisons[i]] * bininds, 1)[self.subcube[self.n]['ok']] for i in range(len(comparisons))]), 0)
-                    skyC = np.sum(np.array([np.sum(self.subcube[self.n]['sky'][comparisons[i]] * bininds, 1)[self.subcube[self.n]['ok']] for i in range(len(comparisons))]), 0)
+                    raw_countsT = np.array(np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1))
+                    skyT = np.array(np.sum(self.subcube[self.n]['sky'][target] * bininds, 1))
+                    raw_countsC = np.sum(np.array([np.sum(self.subcube[self.n]['raw_counts'][comparisons[i]] * bininds, 1) for i in range(len(comparisons))]), 0)
+                    skyC = np.sum(np.array([np.sum(self.subcube[self.n]['sky'][comparisons[i]] * bininds, 1) for i in range(len(comparisons))]), 0)
                     sigmaT = np.sqrt(raw_countsT+skyT)/raw_countsT
                     sigmaC = np.sqrt(raw_countsC+skyC)/raw_countsC
                     sigmaF = np.sqrt(sigmaT**2 + sigmaC**2)
@@ -116,10 +116,10 @@ class LCMaker(Talker, Writer):
 
                     # make list of lightcurves and compcubes used for detrending for each night in subdirectories
                     if self.n == 0: 
-                        bin['lc'] = [(raw_counts_targ/np.mean(raw_counts_targ))[self.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.subcube[self.n]['ok']]]
+                        bin['lc'] = [(raw_counts_targ/np.mean(raw_counts_targ))/(raw_counts_comps/np.mean(raw_counts_comps))]
                         bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
                     else: 
-                        bin['lc'].append((raw_counts_targ/np.mean(raw_counts_targ))[self.subcube[self.n]['ok']]/(raw_counts_comps/np.mean(raw_counts_comps))[self.subcube[self.n]['ok']])
+                        bin['lc'].append((raw_counts_targ/np.mean(raw_counts_targ))/(raw_counts_comps/np.mean(raw_counts_comps)))
                         bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
 

@@ -129,11 +129,11 @@ class Plotter(Talker):
             lcplots.setdefault('lcplusmodel', []).append(plt.subplot(gs[0:2,0]))
             lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
 
-            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n], 'o', markeredgecolor='none', alpha=0.5)
+            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
             lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], models[n], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=20)
 
-            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]-models[n], 'o', alpha=0.5)
+            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]]-models[n], 'o', alpha=0.5)
             lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
             lcplots['residuals'][0].set_xlabel('bjd-'+str(t0), fontsize=20)
             lcplots['residuals'][0].set_ylabel('residuals', fontsize=20)
@@ -146,7 +146,7 @@ class Plotter(Talker):
         self.speak('plotting lmfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, night in enumerate(self.inputs.subdirectories):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', markeredgecolor='none', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]]/modelobj.fitmodel[n], 'o', markeredgecolor='none', alpha=0.5)
         for n, night in enumerate(self.inputs.subdirectories):
             plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
@@ -161,9 +161,9 @@ class Plotter(Talker):
         self.speak('plotting fit residual histogram')
         dist = []
         for n, night in enumerate(self.inputs.subdirectories):
-            resid = self.wavebin['lc'][n] - models[n]
+            resid = self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n]
             data_unc = np.std(resid)
-            dist.append((self.wavebin['lc'][n] - models[n])/data_unc)
+            dist.append((self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])/data_unc)
         dist = np.hstack(dist)
         n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
         gaussiandist = np.random.randn(10000)

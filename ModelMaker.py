@@ -24,12 +24,12 @@ class ModelMaker(Talker):
             N = len(poly)
             polymodel = 0
             while N > 0:
-                polymodel = polymodel + poly[N-1]*(self.wavebin['compcube'][n]['bjd']-self.inputs.toff[n])**(N-1)
+                polymodel = polymodel + poly[N-1]*(self.wavebin['compcube'][n]['bjd'][self.wavebin['binnedok'][n]]-self.inputs.toff[n])**(N-1)
                 N = N -1
             x = []
             for flabel in self.inputs.fitlabels[n]:
                 paramind = int(np.where(np.array(self.inputs.freeparamnames) == flabel+str(n))[0])
-                x.append(self.params[paramind]*self.wavebin['compcube'][n][flabel])
+                x.append(self.params[paramind]*self.wavebin['compcube'][n][flabel][self.wavebin['binnedok'][n]])
             parammodel = np.sum(x, 0)
             self.fitmodel.append(polymodel + parammodel + 1)
 
@@ -71,7 +71,9 @@ class ModelMaker(Talker):
         if self.inputs.istarget == True and self.inputs.isasymm == False:
             self.batmanmodel = []
             for n, night in enumerate(self.inputs.nightname):
-                batman = BatmanLC(times=self.wavebin['compcube'][n]['bjd'], t0=self.inputs.toff[n]+tranvalues[n]['dt'], rp=tranvalues[n]['rp'], per=tranvalues[n]['per'], inc=tranvalues[n]['inc'], a=tranvalues[n]['a'], ecc=tranvalues[n]['ecc'], omega=tranvalues[n]['omega'], u0=tranvalues[n]['u0'], u1=tranvalues[n]['u1'], ldlaw=self.inputs.ldlaw)#, batmanfac=self.inputs.batmanfac)
+                batman = BatmanLC(times=self.wavebin['compcube'][n]['bjd'][self.wavebin['binnedok'][n]], t0=(self.inputs.toff[n]+tranvalues[n]['dt']), 
+                                  rp=tranvalues[n]['rp'], per=tranvalues[n]['per'], inc=tranvalues[n]['inc'], a=tranvalues[n]['a'], ecc=tranvalues[n]['ecc'], omega=tranvalues[n]['omega'], 
+                                  u0=tranvalues[n]['u0'], u1=tranvalues[n]['u1'], ldlaw=self.inputs.ldlaw)#, batmanfac=self.inputs.batmanfac)
                 batmanmodel = batman.batman_model()
                 if n == 0 and np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
                 self.batmanmodel.append(batmanmodel)

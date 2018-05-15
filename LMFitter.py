@@ -58,7 +58,7 @@ class LMFitter(Talker, Writer):
             models = lineareqn(params)
             residuals = []
             for n, night in enumerate(self.inputs.nightname):
-                residuals.append((self.wavebin['lc'][n] - models[n])/self.wavebin['photnoiseest'][n]) # weight by photon noise limit (expected noise)
+                residuals.append((self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])/self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) # weight by photon noise limit (expected noise)
             return np.hstack(residuals)
 
 
@@ -79,23 +79,38 @@ class LMFitter(Talker, Writer):
         modelobj = ModelMaker(self.inputs, self.wavebin, linfit1paramvals)
         models = modelobj.makemodel()
         for n, night in enumerate(self.inputs.nightname):
-            resid = self.wavebin['lc'][n] - models[n]
+            resid = self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n]
+
+            # median absolute deviation
             mad = np.median(abs(resid - np.median(resid)))
             scale = 1.4826
             data_unc = scale*mad               # scale x median absolute deviation
-            clip_inds = np.where((resid > (self.inputs.sigclip*data_unc)) | (resid < (-self.inputs.sigclip*data_unc)))[0]
-            clip_start = np.where(self.wavebin['binnedok'][n])[0][0]
-            self.wavebin['binnedok'][n][clip_start + clip_inds] = False
+            
+            # find indices that do not meet clipping requirement
+            clippoint = (resid > (self.inputs.sigclip*data_unc)) | (resid < (-self.inputs.sigclip*data_unc)) # boolean array; true if point does not meet clipping requirements
+            #print('clippoint', clippoint)
+            
+            # remake 'binnedok'
+            goodinds = np.where(self.wavebin['binnedok'][n])[0] # indices that were fed into the model
+            #print('goodinds', goodinds)
+            clipinds = goodinds[clippoint] # just the indices that should be clipped
+            #print('clipinds', clipinds)
+
+            self.wavebin['binnedok'][n][clipinds] = False
+            #print('new binnedok', self.wavebin['binnedok'][n])
+
+            #clip_start = np.where(self.wavebin['binnedok'][n])[0][0]
+            #self.wavebin['binnedok'][n][clip_start + clip_inds] = False
 
             # need to update wavebin lc and compcube to reflect data clipping
-            newbinnedok = np.ones(self.wavebin['lc'][n].shape, dtype=bool)
-            newbinnedok[clip_inds] = False
-            self.wavebin['lc'][n] = self.wavebin['lc'][n][newbinnedok]
-            self.wavebin['photnoiseest'][n] = self.wavebin['photnoiseest'][n][newbinnedok]
-            self.wavebin['compcube'][n] = self.cube.makeCompCube(self.wavebin['bininds'][n], n, self.wavebin['binnedok'][n])
-            self.write('clipped points for {0}: {1}'.format(night, clip_start+clip_inds))
+            #newbinnedok = np.ones(self.wavebin['lc'][n].shape, dtype=bool)
+            #newbinnedok[clip_inds] = False
+            #self.wavebin['lc'][n] = self.wavebin['lc'][n][newbinnedok]
+            #self.wavebin['photnoiseest'][n] = self.wavebin['photnoiseest'][n][newbinnedok]
+            #self.wavebin['compcube'][n] = self.cube.makeCompCube(self.wavebin['bininds'][n], n, self.wavebin['binnedok'][n])
+            self.write('clipped points for {0}: {1}'.format(night, clipinds))
             np.save(self.savewave, self.wavebin)
-            self.speak('remade lc and compcube for {0} in wavebin {1}'.format(night, self.wavefile))
+            #self.speak('remade lc and compcube for {0} in wavebin {1}'.format(night, self.wavefile))
 
 
         lmfitparams = lmfit.Parameters()
@@ -112,7 +127,7 @@ class LMFitter(Talker, Writer):
             models = lineareqn(params)
             residuals = []
             for n, night in enumerate(self.inputs.nightname):
-                residuals.append((self.wavebin['lc'][n] - models[n])/self.wavebin['photnoiseest'][n]) # weight by photon noise limit (expected noise)
+                residuals.append((self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])/self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) # weight by photon noise limit (expected noise)
             return np.hstack(residuals)
 
         self.linfit2 = lmfit.minimize(fcn=residuals2, params=lmfitparams, method='leastsq', **fit_kws)
@@ -139,7 +154,7 @@ class LMFitter(Talker, Writer):
         models = modelobj.makemodel()
         data_uncs2 = []
         for n, night in enumerate(self.inputs.nightname):
-            resid = self.wavebin['lc'][n] - models[n]
+            resid = self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n]
             data_unc = np.std(resid)
             data_uncs2.append(data_unc)
         self.write('lmfit2 data uncs: {0}'.format(data_uncs2))
@@ -148,7 +163,7 @@ class LMFitter(Talker, Writer):
             models = lineareqn(params)
             residuals = []
             for n, night in enumerate(self.inputs.nightname):
-                residuals.append((self.wavebin['lc'][n] - models[n])/data_uncs2[n]) # weight by calculated uncertainty
+                residuals.append((self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])/data_uncs2[n]) # weight by calculated uncertainty
             return np.hstack(residuals)
 
         self.linfit3 = lmfit.minimize(fcn=residuals3, params=lmfitparams, method='leastsq', **fit_kws)
@@ -169,7 +184,7 @@ class LMFitter(Talker, Writer):
 
         resid = []
         for n in range(len(self.inputs.nightname)):
-            resid.append(self.wavebin['lc'][n] - models[n])
+            resid.append(self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('lmfit overall RMS: '+str(data_unc))  # this is the same as the rms!
@@ -182,9 +197,9 @@ class LMFitter(Talker, Writer):
         # var = np.power(data_unc, 2.)
         var = 4.5e-7    # variance must remain fixed across all trials in order to make a comparison of BIC values
         for n, night in enumerate(self.inputs.nightname):
-            lnlike = -0.5*np.sum((self.wavebin['lc'][n] - models[n])**2/var + np.log(2.*np.pi*var))
+            lnlike = -0.5*np.sum((self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])**2/var + np.log(2.*np.pi*var))
             plbls = len(np.where([k.endswith((str(0))) for k in self.linfit3.params.keys()])[0])
-            lnn = np.log(len(self.wavebin['lc'][n]))
+            lnn = np.log(len(self.wavebin['lc'][n][self.wavebin['binnedok'][n]]))
             BIC = -2.*lnlike + plbls*lnn
             self.write('{0} BIC: {1}'.format(night, BIC))
 
