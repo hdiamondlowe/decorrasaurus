@@ -123,7 +123,7 @@ class Inputs(Talker):
             self.fitlabels = [dictionary['fitlabels']]
             if type(self.fitlabels[self.n]) == str: self.fitlabels[self.n] = [self.fitlabels[self.n]]
             self.polyfit = [int(dictionary['polyfit'])]
-            self.polylabels = [[string.uppercase[x] for x in range(self.polyfit[self.n])]]
+            self.polylabels = [[string.ascii_uppercase[x] for x in range(self.polyfit[self.n])]]
 
             self.Teff = float(dictionary['Teff'])
             self.Teff_unc = float(dictionary['Teff_unc'])

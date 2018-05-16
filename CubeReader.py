@@ -35,6 +35,7 @@ class CubeReader(Talker):
 
         self.speak('reading in datacube from {0} and extracting the arrays you care about'.format(self.subdir))
         cube = np.load(self.datacubepath)[()]
+        spec = np.load('spectralstretch.npy')[()]
 
         self.speak('making subcube of just the arrays you care about from the full cube from {0}'.format(self.subdir))
         
@@ -56,8 +57,8 @@ class CubeReader(Talker):
         # have to re-make these dictionaries
         subcube['centroid'] = deepcopy(cube['squares']['centroid'])    # [star](time)
         subcube['width'] = deepcopy(cube['squares']['width'])          # [star](time)
-        #subcube['stretch'] = deepcopy(cube['squares']['stretch'])      # [star](time)
-        #subcube['shift'] = deepcopy(cube['squares']['shift'])          # [star](time)
+        subcube['stretch'] = deepcopy(spec['stretch'])                 # [star](time)
+        subcube['shift'] = deepcopy(spec['shift'])          # [star](time)
 
         subcube['raw_counts'] = deepcopy(cube['cubes']['raw_counts'])  # [star](time, wave)
         subcube['sky'] = deepcopy(cube['cubes']['sky'])                # [star](time, wave)
@@ -98,10 +99,23 @@ class CubeReader(Talker):
             sig2 = raw_counts_comps + sky_counts_comps
             den = np.sum((1./sig2), 0)
 
-        for key in ['centroid', 'width']: #, 'stretch', 'shift']:
+        for key in ['centroid', 'width']:#, 'stretch', 'shift']:
             # detrend against target or comparisons, as specified in inputs
             if self.inputs.against == 'target': keyarray = np.array(self.subcube[self.n][key][target])
             elif self.inputs.against == 'comparisons': keyarray = np.array([self.subcube[self.n][key][comparisons[i]] for i in range(len(comparisons))])
+            else: self.speak('you have not specified what to detrend against; must be target or comparisons')
+
+            if self.inputs.invvar:
+                num = np.sum((keyarray/sig2), 0)
+                self.compcube[key] = num/den
+            else:
+                summed = np.sum(keyarray, 0)
+                self.compcube[key] = (summed - np.mean(summed))/np.std(summed)
+
+        for key in ['stretch', 'shift']:
+            # detrend against target or comparisons, as specified in inputs
+            if self.inputs.against == 'target': keyarray = list(self.subcube[self.n][key][target].values()[0])
+            elif self.inputs.against == 'comparisons': keyarray = np.array([list(self.subcube[self.n][key][comparisons[i]].values()) for i in range(len(comparisons))])
             else: self.speak('you have not specified what to detrend against; must be target or comparisons')
 
             if self.inputs.invvar:
