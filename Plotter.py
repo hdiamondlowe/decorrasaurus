@@ -78,6 +78,8 @@ class Plotter(Talker):
         modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['lmfit']['values'])
         models = modelobj.makemodel()
 
+        colors = ['C0', 'C1', 'C2', 'C3', 'C4', 'C8', 'C9']
+
         t0 = []
         for n, night in enumerate(self.inputs.nightname):
             if 'dt'+str(n) in self.inputs.freeparamnames:
@@ -92,12 +94,12 @@ class Plotter(Talker):
             for n, subdir in enumerate(self.inputs.subdirectories):
                 self.speak('plotting normalized wavelength binned raw counts vs time for target and comparisons for {0}'.format(self.inputs.nightname[n]))
                 target, comparisons = self.subcube[n]['target'], self.subcube[n]['comparisons']
-                binnedtarg = np.sum(self.subcube[n]['raw_counts'][target] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]]
-                binnedcomp = np.array([np.sum(self.subcube[n]['raw_counts'][comparisons[i]] * self.wavebin['bininds'][n], 1)[self.wavebin['binnedok'][n]] for i in range(len(comparisons))])
+                binnedtarg = np.sum(self.subcube[n]['raw_counts'][target] * self.wavebin['bininds'][n], 1)
+                binnedcomp = np.array([np.sum(self.subcube[n]['raw_counts'][comparisons[i]] * self.wavebin['bininds'][n], 1) for i in range(len(comparisons))])
                 plt.figure()
-                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
+                plt.plot(self.subcube[n]['bjd']-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
                 for i,c in enumerate(binnedcomp):
-                    plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], c/np.median(c), '.', alpha=0.5, label=comparisons[i])
+                    plt.plot(self.subcube[n]['bjd']-t0[n], c/np.median(c), '.', alpha=0.5, label=comparisons[i])
                 plt.legend(loc='best')
                 plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
                 plt.ylabel('normalized flux', fontsize=20)
@@ -110,8 +112,8 @@ class Plotter(Talker):
                 self.speak('plotting normalized wavelength binned raw counts vs time for target and summed comparisons for {0}'.format(self.inputs.nightname[n]))
                 plt.figure()
                 binnedsupercomp = np.sum(binnedcomp, 0)
-                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
-                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], binnedsupercomp/np.median(binnedsupercomp), '.', alpha=0.5, label='summedcomp')
+                plt.plot(self.subcube[n]['bjd']-t0[n], binnedtarg/np.median(binnedtarg), '.', alpha=0.5, label=target)
+                plt.plot(self.subcube[n]['bjd']-t0[n], binnedsupercomp/np.median(binnedsupercomp), '.', alpha=0.5, label='summedcomp')
                 plt.legend(loc='best')
                 plt.xlabel('bjd-'+str(t0[n]), fontsize=20)
                 plt.ylabel('normalized nlux', fontsize=20)
@@ -129,11 +131,15 @@ class Plotter(Talker):
             lcplots.setdefault('lcplusmodel', []).append(plt.subplot(gs[0:2,0]))
             lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
 
+            # plot the points that were used in the fit
             lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
-            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], models[n], 'k-', lw=2, alpha=0.5)
+            # plot the points that were not used
+            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=20)
 
-            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]]-models[n], 'o', alpha=0.5)
+            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]-models[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
             lcplots['residuals'][0].set_xlabel('bjd-'+str(t0), fontsize=20)
             lcplots['residuals'][0].set_ylabel('residuals', fontsize=20)
@@ -146,9 +152,11 @@ class Plotter(Talker):
         self.speak('plotting lmfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, night in enumerate(self.inputs.subdirectories):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]]/modelobj.fitmodel[n], 'o', markeredgecolor='none', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
         for n, night in enumerate(self.inputs.subdirectories):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
+            #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
+            plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
         plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
@@ -161,9 +169,9 @@ class Plotter(Talker):
         self.speak('plotting fit residual histogram')
         dist = []
         for n, night in enumerate(self.inputs.subdirectories):
-            resid = self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n]
+            resid = (self.wavebin['lc'][n] - models[n])[self.wavebin['binnedok'][n]]
             data_unc = np.std(resid)
-            dist.append((self.wavebin['lc'][n][self.wavebin['binnedok'][n]] - models[n])/data_unc)
+            dist.append((self.wavebin['lc'][n] - models[n])[self.wavebin['binnedok'][n]]/data_unc)
         dist = np.hstack(dist)
         n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
         gaussiandist = np.random.randn(10000)
