@@ -34,7 +34,6 @@ class Plotter(Talker):
         plt.savefig(self.inputs.saveas+'figure_rawspectra.png')
         plt.clf()
         plt.close()
-        
 
     def lcplots(self, wavebin):
 
@@ -63,6 +62,19 @@ class Plotter(Talker):
             plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
             plt.tight_layout()
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedspectrum_'+self.inputs.nightname[n]+'.png')
+            plt.clf()
+            plt.close()
+
+        self.speak('plotting fit parameters')
+        for n, subdir in enumerate(self.inputs.subdirectories):
+            for f in self.inputs.fitlabels[n]:
+                plt.plot(self.wavebin['compcube'][n]['bjd'][self.wavebin['binnedok'][n]], self.wavebin['compcube'][n][f][self.wavebin['binnedok'][n]], alpha=0.7, label=f)
+            plt.legend(loc='best')
+            plt.xlabel('bjd')
+            plt.ylabel('parameter')
+            plt.title(self.inputs.nightname[n]+', '+self.wavefile+', decorrelation parameters')
+            plt.tight_layout()
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_decorrelationparams_'+self.inputs.nightname[n]+'.png')
             plt.clf()
             plt.close()
 
