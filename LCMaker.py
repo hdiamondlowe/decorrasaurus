@@ -23,12 +23,11 @@ class LCMaker(Talker, Writer):
         self.makeBinnedLCs()
 
     def trimTimeSeries(self):
-        '''trim the baseline of the time series to 1.5 * transit duration on either side of the transit midpoint'''
+        '''trim the baseline of the time series to  * transit duration on either side of the transit midpoint'''
         # trim the light curves such that there is 1 transit duration on either side of the transit, and not more
         # Tdur needs to be in days
-        self.speak('trimming excess baseline from {0}'.format(self.subdir))
-        outside_transit = np.where((self.subcube[self.n]['bjd'] < self.inputs.t0[self.n]-(1.5*self.inputs.Tdur)) | (self.subcube[self.n]['bjd'] > self.inputs.t0[self.n]+(1.5*self.inputs.Tdur)))
-        # !!! may have issue here when changing the midpoint time; may need to reset self.ok to all True and then add in time clip
+        self.speak('trimming excess baseline by {0} x Tdur for {1}'.format(self.inputs.timesTdur, self.subdir))
+        outside_transit = np.where((self.subcube[self.n]['bjd'] < self.inputs.t0[self.n]-(self.inputs.timesTdur*self.inputs.Tdur)) | (self.subcube[self.n]['bjd'] > self.inputs.t0[self.n]+(self.inputs.timesTdur*self.inputs.Tdur)))
         self.subcube[self.n]['trimmedok'][outside_transit] = False
 
     def maskStarSpot(self):

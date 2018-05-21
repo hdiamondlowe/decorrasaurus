@@ -161,9 +161,7 @@ class Inputs(Talker):
             self.tranparams = [[str_to_bool(i) for i in dictionary['tranparams']]]
             self.tranbounds = [[[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]]
             self.wavelength_lims = [float(i) for i in dictionary['wavelength_lims']]
-            if len(self.tranbounds[self.n][0]) != len(self.tranlabels[self.n]) or len(self.tranbounds[self.n][1]) != len(self.tranlabels[self.n]):
-                self.speak('oh no! incorrect number of bounds!')
-                return
+            assert(len(self.tranbounds[self.n][0]) == len(self.tranlabels[self.n]) and len(self.tranbounds[self.n][1]) == len(self.tranlabels[self.n])), 'There is something wrong with the transit parameter bounds'
 
             self.fitparams = [[1 for f in self.fitlabels[self.n]]]
             self.polyparams = [[1 for p in self.polylabels[self.n]]]
@@ -225,14 +223,15 @@ class Inputs(Talker):
         if self.n == 0:
             self.binlen = str_to_bool(dictionary['binlen'])
             self.sigclip = float(dictionary['sigclip'])
+            self.timesTdur = float(dictionary['timesTdur'])
             try: self.midclip_inds = [str_to_bool(dictionary['midclip_inds'])]
             except(TypeError): self.midclip_inds = [[int(i) for i in dictionary['midclip_inds']]]
 
-            self.mcmccode = dictionary['mcmccode']
+            self.samplecode = dictionary['samplecode']
             
-            if self.mcmccode == 'dynesty': pass
+            if self.samplecode == 'dynesty': pass
                 
-            elif self.mcmccode == 'emcee':
+            elif self.samplecode == 'emcee':
                 self.nwalkers = int(dictionary['nwalkers'])
                 self.nsteps = int(dictionary['nsteps'])
                 self.burnin = int(dictionary['burnin'])

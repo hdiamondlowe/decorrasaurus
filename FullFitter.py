@@ -34,7 +34,7 @@ class FullFitter(Talker, Writer):
         self.wavebin = np.load(self.savewave+'.npy')[()]
         if 'mcfit' in self.wavebin.keys():
             self.speak('mcfit already exists for wavelength bin {0}'.format(self.wavefile))
-            if self.inputs.mcmccode == 'emcee':
+            if self.inputs.samplecode == 'emcee':
                 if self.wavebin['mcfit']['chain'].shape[1] == self.inputs.nsteps:
                     self.speak('mcfit has completed the number of steps')
                 elif self.wavebin['mcfit']['chain'].shape[1] < self.inputs.nsteps:
@@ -42,8 +42,8 @@ class FullFitter(Talker, Writer):
                     self.runFullFit_dynesty()
         else: 
             self.speak('running mcfit for wavelength bin {0}'.format(self.wavefile))
-            if self.inputs.mcmccode == 'emcee': self.runFullFit_emcee()
-            elif self.inputs.mcmccode == 'dynesty': self.runFullFit_dynesty()
+            if self.inputs.samplecode == 'emcee': self.runFullFit_emcee()
+            elif self.inputs.samplecode == 'dynesty': self.runFullFit_dynesty()
 
     def runFullFit_emcee(self):
 
