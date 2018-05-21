@@ -40,30 +40,31 @@ class Plotter(Talker):
         self.wavebin = wavebin
         self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
 
-        self.speak('plotting binned light curve')
-        plt.figure()
-        for n, subdir in enumerate(self.inputs.subdirectories):
-            target = self.subcube[n]['target']
-            comparisons = self.subcube[n]['comparisons']
-            expind = np.where(self.subcube[n]['airmass'] == min(self.subcube[n]['airmass']))[0][0] # use the exposer at lowest airmass
-            bininds = self.wavebin['bininds'][n]
+        if self.inputs.makeplots:
+            self.speak('plotting binned light curve')
+            plt.figure()
+            for n, subdir in enumerate(self.inputs.subdirectories):
+                target = self.subcube[n]['target']
+                comparisons = self.subcube[n]['comparisons']
+                expind = np.where(self.subcube[n]['airmass'] == min(self.subcube[n]['airmass']))[0][0] # use the exposer at lowest airmass
+                bininds = self.wavebin['bininds'][n]
 
-            targcounts = self.subcube[n]['raw_counts'][target][expind]*bininds
-            where = np.where(targcounts)[0]
-            plt.plot(self.subcube[n]['wavelengths'], targcounts/np.median(targcounts[where]), alpha=0.75, lw=2, label=target)
-            for comp in comparisons:
-                compcounts = self.subcube[n]['raw_counts'][comp][expind]*bininds
-                where = np.where(compcounts)
-                plt.plot(self.subcube[n]['wavelengths'], compcounts/np.median(compcounts[where]), alpha=0.75, lw=2, label=comp)
-            plt.legend(loc='best')
-            plt.xlabel('wavelength [angstroms]', fontsize=20)
-            plt.ylabel('normalized raw flux', fontsize=20)
-            plt.xlim(self.wavebin['wavelims'][0], self.wavebin['wavelims'][1])
-            plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
-            plt.tight_layout()
-            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedspectrum_'+self.inputs.nightname[n]+'.png')
-            plt.clf()
-            plt.close()
+                targcounts = self.subcube[n]['raw_counts'][target][expind]*bininds
+                where = np.where(targcounts)[0]
+                plt.plot(self.subcube[n]['wavelengths'], targcounts/np.median(targcounts[where]), alpha=0.75, lw=2, label=target)
+                for comp in comparisons:
+                    compcounts = self.subcube[n]['raw_counts'][comp][expind]*bininds
+                    where = np.where(compcounts)
+                    plt.plot(self.subcube[n]['wavelengths'], compcounts/np.median(compcounts[where]), alpha=0.75, lw=2, label=comp)
+                plt.legend(loc='best')
+                plt.xlabel('wavelength [angstroms]', fontsize=20)
+                plt.ylabel('normalized raw flux', fontsize=20)
+                plt.xlim(self.wavebin['wavelims'][0], self.wavebin['wavelims'][1])
+                plt.title(self.inputs.nightname[n]+', '+self.wavefile+' angstroms')
+                plt.tight_layout()
+                plt.savefig(self.inputs.saveas+self.wavefile+'_figure_wavebinnedspectrum_'+self.inputs.nightname[n]+'.png')
+                plt.clf()
+                plt.close()
 
         self.speak('plotting fit parameters')
         for n, subdir in enumerate(self.inputs.subdirectories):

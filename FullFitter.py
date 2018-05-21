@@ -11,6 +11,8 @@ from .ModelMaker import ModelMaker
 from .CubeReader import CubeReader
 from .Plotter import Plotter
 import multiprocessing
+from scipy import stats
+import scipy.interpolate as interpolate
 #import emceehelper as mc
 
 class FullFitter(Talker, Writer):
@@ -25,7 +27,7 @@ class FullFitter(Talker, Writer):
         self.inputs = self.detrender.inputs
         self.subcube = self.detrender.cube.subcube
         self.wavefile = wavefile
-        self.savewave = self.inputs.saveas+self.wavefils
+        self.savewave = self.inputs.saveas+self.wavefile
         
         Writer.__init__(self, self.savewave+'.txt')
 
@@ -37,13 +39,13 @@ class FullFitter(Talker, Writer):
                     self.speak('mcfit has completed the number of steps')
                 elif self.wavebin['mcfit']['chain'].shape[1] < self.inputs.nsteps:
                     self.speak('extending mcfit for more steps')
-                    self.runMCFit_dynesty()
+                    self.runFullFit_dynesty()
         else: 
             self.speak('running mcfit for wavelength bin {0}'.format(self.wavefile))
-            if self.inputs.mcmccode == 'emcee': self.runMCFit_emcee()
-            elif self.inputs.mcmccode == 'dynesty': self.runMCFit_dynesty()
+            if self.inputs.mcmccode == 'emcee': self.runFullFit_emcee()
+            elif self.inputs.mcmccode == 'dynesty': self.runFullFit_dynesty()
 
-    def runMCFit_emcee(self):
+    def runFullFit_emcee(self):
 
         if self.inputs.ldmodel:
             self.limbdarkparams(self.wavebin['wavelims'][0]/10., self.wavebin['wavelims'][1]/10.)
@@ -68,7 +70,7 @@ class FullFitter(Talker, Writer):
             models = makemodellocal(inputs, wavebin, p)
             residuals = []
             for n, night in enumerate(self.inputs.nightname):
-                residuals.append(self.wavebin['lc'][n] - models[n])
+                residuals.append((self.wavebin['lc'][n] - models[n])[self.wavebin['binnedok'][n]])
             residuals = np.hstack(residuals)
             data_unc = (np.std(residuals))**2
             return -0.5*np.sum((residuals)**2/data_unc + np.log(2.*np.pi*data_unc))
@@ -182,7 +184,7 @@ class FullFitter(Talker, Writer):
             self.inputs.freeparamvalues.append(self.wavebin['ldparams'][0][1])
             self.inputs.freeparambounds[0].append(0.0)          
             self.inputs.freeparambounds[1].append(1.0)
-            # need to re-set the boundary names so that ModelMakerJoint will know to use the same 'u00' and 'u01' for all nights
+            # need to re-set the boundary names so that ModelMaker will know to use the same 'u00' and 'u01' for all nights
             for n, night in enumerate(self.inputs.nightname):
                 if n == 0: self.inputs.tranbounds[n][0][-2], self.inputs.tranbounds[n][0][-1], self.inputs.tranbounds[n][1][-2], self.inputs.tranbounds[n][1][-1] = True, True, True, True
                 else: self.inputs.tranbounds[n][0][-2], self.inputs.tranbounds[n][0][-1], self.inputs.tranbounds[n][1][-2], self.inputs.tranbounds[n][1][-1] = 'Joint', 'Joint', 0.0, 0.0
@@ -213,15 +215,15 @@ class FullFitter(Talker, Writer):
             #rpind = int(np.where(np.array(self.inputs.freeparamnames) == 'rp'+str(0))[0])
             #logl = -0.5 * ((p[rpind] - 0.05)/0.01)**2
             #return logl
-            modelobj = ModelMakerJoint(self.inputs, self.wavebin, p)
+            modelobj = ModelMaker(self.inputs, self.wavebin, p)
             models = modelobj.makemodel()
             logl = []
             for n, night in enumerate(self.inputs.nightname):
                 # p[sind] is an 's' parameter; if the uncertainties do not need to be re-scaled then s = 1
                 # there is a single 's' parameter for each night's fit - helpful if a dataset is far from the photon noise
                 sind = int(np.where(np.array(self.inputs.freeparamnames) == 's'+str(n))[0])
-                penaltyterm = -len(self.wavebin['photnoiseest'][n]) * np.log(p[sind])
-                chi2 = ((self.wavebin['lc'][n] - models[n])/self.wavebin['photnoiseest'][n])**2
+                penaltyterm = -len(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) * np.log(p[sind])
+                chi2 = (((self.wavebin['lc'][n] - models[n])/self.wavebin['photnoiseest'][n])[self.wavebin['binnedok'][n]])**2
                 logl.append(penaltyterm - 0.5*(1./(p[sind]**2))*np.sum(chi2))
             return np.sum(logl)
             
@@ -278,21 +280,21 @@ class FullFitter(Talker, Writer):
             self.write('mcfit transit midpoint for {0}: {1}'.format(night, self.inputs.t0[n]))
 
         #calculate rms from mcfit
-        modelobj = ModelMakerJoint(self.inputs, self.wavebin, self.mcparams[:,0])
+        modelobj = ModelMaker(self.inputs, self.wavebin, self.mcparams[:,0])
         models = modelobj.makemodel()
         resid = []
         for n in range(len(self.inputs.nightname)):
-            resid.append(self.wavebin['lc'][n] - models[n])
+            resid.append((self.wavebin['lc'][n] - models[n])[self.wavebin['binnedok'][n]])
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('mcfit overall RMS: '+str(data_unc))
 
         # how many times the expected noise is the rms?
         for n, night in enumerate(self.inputs.nightname):
-            self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n])))
-        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n]) for n in range(len(self.inputs.nightname))])))
+            self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]])))
+        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) for n in range(len(self.inputs.nightname))])))
 
-        plot = PlotterJoint(self.inputs, self.cube)
+        plot = Plotter(self.inputs, self.cube)
         plot.mcplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))

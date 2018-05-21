@@ -135,7 +135,6 @@ class LCMaker(Talker, Writer):
                 np.save(self.inputs.saveas+wavefile, bin)
                 self.speak('saved dictionary for wavelength bin {0}'.format(wavefile))
 
-                if self.inputs.makeplots:
-                    plot = Plotter(self.inputs, self.subcube)
-                    plot.lcplots(bin)
+                plot = Plotter(self.inputs, self.subcube)
+                plot.lcplots(bin)
 
