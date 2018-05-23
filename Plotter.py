@@ -69,7 +69,9 @@ class Plotter(Talker):
         self.speak('plotting fit parameters')
         for n, subdir in enumerate(self.inputs.subdirectories):
             for f in self.inputs.fitlabels[n]:
-                plt.plot(self.wavebin['compcube'][n]['bjd'][self.wavebin['binnedok'][n]], self.wavebin['compcube'][n][f][self.wavebin['binnedok'][n]], alpha=0.7, label=f)
+                plt.plot(self.wavebin['compcube'][n]['bjd'][self.wavebin['binnedok'][n]], self.wavebin['compcube'][n][f][self.wavebin['binnedok'][n]], alpha=0.7, label=f+str(n))
+            for p in range(self.inputs.polyfit[n]):
+                plt.plot(self.wavebin['compcube'][n]['bjd'][self.wavebin['binnedok'][n]], ((self.wavebin['compcube'][n]['bjd'] - self.inputs.toff[n])[self.wavebin['binnedok'][n]])**p, label='polyfit '+str(p))
             plt.legend(loc='best')
             plt.xlabel('bjd')
             plt.ylabel('parameter')

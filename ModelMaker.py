@@ -24,8 +24,8 @@ class ModelMaker(Talker):
             N = len(poly)
             polymodel = 0
             while N > 0:
-                polymodel = polymodel + poly[N-1]*(self.wavebin['compcube'][n]['bjd']-self.inputs.toff[n])**(N-1)
-                N = N -1
+                polymodel += poly[N-1]*(self.wavebin['compcube'][n]['bjd']-self.inputs.toff[n])**(N-1)
+                N -= 1
             x = []
             for flabel in self.inputs.fitlabels[n]:
                 paramind = int(np.where(np.array(self.inputs.freeparamnames) == flabel+str(n))[0])

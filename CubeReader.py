@@ -23,6 +23,7 @@ class CubeReader(Talker):
                 self.n = n
                 self.subdir = subdir
                 self.datacubepath = self.inputs.datacubepath[self.n]
+                self.specstretchpath = self.inputs.specstretchpath[self.n]
                 self.makeSubCube()
             np.save(self.inputs.saveas+'subcube.npy', self.subcube)
             self.speak('subcube saved')
@@ -35,7 +36,7 @@ class CubeReader(Talker):
 
         self.speak('reading in datacube from {0} and extracting the arrays you care about'.format(self.subdir))
         cube = np.load(self.datacubepath)[()]
-        spec = np.load('spectralstretch.npy')[()]
+        spec = np.load(self.specstretchpath)[()]
 
         self.speak('making subcube of just the arrays you care about from the full cube from {0}'.format(self.subdir))
         

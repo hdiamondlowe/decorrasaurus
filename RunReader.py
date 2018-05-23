@@ -39,7 +39,8 @@ class RunReader(Talker, Writer):
         # need the directory names as an input to Inputs
         self.subdirectories = [d for d in os.listdir('.') if os.path.isdir(os.path.join('.', d))]
         if 'run' in self.subdirectories: self.subdirectories.remove('run')
-        self.subdirectories = sorted(self.subdirectories, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
+        #self.subdirectories = sorted(self.subdirectories, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
+        self.subdirectories = [1]
 
         self.inputs = Inputs(self.subdirectories, self.rundirectory)
 

@@ -246,6 +246,7 @@ class Inputs(Talker):
             self.makeplots = str_to_bool(dictionary['makeplots'])
 
             self.datacubepath = [dictionary['datacubepath']]
+            self.specstretchpath = [dictionary['specstretchpath']]
         
         else:
 
@@ -253,6 +254,7 @@ class Inputs(Talker):
             except(TypeError): self.midclip_inds.append([int(i) for i in dictionary['midclip_inds']])
 
             self.datacubepath.append(dictionary['datacubepath'])
+            self.specstretchpath.append(dictionary['specstretchpath'])
 
 
                     
