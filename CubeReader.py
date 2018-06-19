@@ -44,6 +44,8 @@ class CubeReader(Talker):
 
         subcube['target'] = cube['target']
         subcube['comparisons'] = cube['comparisons']
+        #subcube['target'] = cube['comparisons'][1]
+        #subcube['comparisons'] = [cube['comparisons'][3]]
 
         subcube['mosasaurusok'] = deepcopy(cube['temporal']['ok'])     # (time)
         subcube['trimmedok'] = np.ones_like(subcube['mosasaurusok'])  # (time) making this ahead of time for when we trim the light curve in time (LCMaker)
@@ -58,6 +60,7 @@ class CubeReader(Talker):
         # have to re-make these dictionaries
         subcube['centroid'] = deepcopy(cube['squares']['centroid'])    # [star](time)
         subcube['width'] = deepcopy(cube['squares']['width'])          # [star](time)
+        #subcube['median_width'] = deepcopy(cube['squares']['median_width']) # [star](time)
         subcube['stretch'] = deepcopy(spec['stretch'])                 # [star](time)
         subcube['shift'] = deepcopy(spec['shift'])          # [star](time)
 
@@ -100,10 +103,11 @@ class CubeReader(Talker):
                 sig2 = raw_counts_comps + sky_counts_comps
                 den = np.sum((1./sig2), 0)
 
-            if key in ['centroid', 'width']:#, 'stretch', 'shift']:
+            if key in ['centroid', 'width', 'median_width']:#, 'stretch', 'shift']:
                 # detrend against target or comparisons, as specified in inputs
                 if self.inputs.against == 'target': keyarray = np.array([self.subcube[self.n][key][target]])
                 elif self.inputs.against == 'comparisons': keyarray = np.array([self.subcube[self.n][key][comparisons[i]] for i in range(len(comparisons))])
+                elif self.inputs.against == 'difference': keyarray = np.array([self.subcube[self.n][key][target]]) - np.array([self.subcube[self.n][key][comparisons[i]] for i in range(len(comparisons))])
                 else: self.speak('you have not specified what to detrend against; must be target or comparisons')
 
                 if self.inputs.invvar:
@@ -115,8 +119,9 @@ class CubeReader(Talker):
 
             if key in ['stretch', 'shift']:
                 # detrend against target or comparisons, as specified in inputs
-                if self.inputs.against == 'target': keyarray = [list(self.subcube[self.n][key][target].values())]
+                if self.inputs.against == 'target': keyarray = np.array([list(self.subcube[self.n][key][target].values())])
                 elif self.inputs.against == 'comparisons': keyarray = np.array([list(self.subcube[self.n][key][comparisons[i]].values()) for i in range(len(comparisons))])
+                elif self.inputs.against == 'difference': keyarray = np.array([list(self.subcube[self.n][key][target].values())]) - np.array([list(self.subcube[self.n][key][comparisons[i]].values()) for i in range(len(comparisons))])
                 else: self.speak('you have not specified what to detrend against; must be target or comparisons')
 
                 if self.inputs.invvar:
@@ -130,6 +135,7 @@ class CubeReader(Talker):
                 # detrend against target or comparisons, as specified in inputs
                 if self.inputs.against == 'target': keyarray = np.array([np.nansum(self.subcube[self.n][key][target] * self.subbinindices, 1)])
                 elif self.inputs.against == 'comparisons': keyarray = np.array([np.nansum(self.subcube[self.n][key][comparisons[i]] * self.subbinindices, 1) for i in range(len(comparisons))])
+                elif self.inputs.against == 'difference': keyarray = np.array([np.nansum(self.subcube[self.n][key][target] * self.subbinindices, 1)]) - np.array([np.nansum(self.subcube[self.n][key][comparisons[i]] * self.subbinindices, 1) for i in range(len(comparisons))])
                 else: self.speak('you have not specified what to detrend against; must be target or comparisons')
                 if self.inputs.invvar:
                     num = np.sum((keyarray/sig2), 0)

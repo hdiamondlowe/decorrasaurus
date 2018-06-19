@@ -66,7 +66,7 @@ class ModelMaker(Talker):
             tranvalues.append(values)
 
         #print [tranvalues[n]['dt'] for n in range(len(self.inputs.nightname))]
-        #print self.params[0:11]
+        #print(self.params)
 
         if self.inputs.istarget == True and self.inputs.isasymm == False:
             self.batmanmodel = []
@@ -93,8 +93,10 @@ class ModelMaker(Talker):
             for i in range(len(tau0)):
                 F -= 2.*rp[i] * (np.exp((t-tau0[i])/tau2[i]) + np.exp(-(t-tau0[i])/tau1[i]))**(-1)
             self.batmanmodel = F
-        elif self.inputs.istarget == False: 
-            self.batmanmodel = np.ones(len(self.wavebin['compcube']['bjd']))
+        elif self.inputs.istarget == False:
+            self.batmanmodel = []
+            for n, night in enumerate(self.inputs.nightname):
+                self.batmanmodel.append(np.ones_like(self.wavebin['compcube'][n]['bjd']))
         #if self.dividewhite == True: return self.fit_model*self.batman_model*self.Zwhite[self.binnedok]*self.Zlambdat[self.binnedok]
         return np.array(self.fitmodel)*np.array(self.batmanmodel)
 
