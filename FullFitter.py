@@ -13,6 +13,8 @@ from .Plotter import Plotter
 import multiprocessing
 from scipy import stats
 import scipy.interpolate as interpolate
+import dill
+import pickle
 #import emceehelper as mc
 
 class FullFitter(Talker, Writer):
@@ -28,6 +30,7 @@ class FullFitter(Talker, Writer):
         self.subcube = self.detrender.cube.subcube
         self.wavefile = wavefile
         self.savewave = self.inputs.saveas+self.wavefile
+        print(self.savewave)
         
         Writer.__init__(self, self.savewave+'.txt')
 
@@ -39,7 +42,7 @@ class FullFitter(Talker, Writer):
                     self.speak('mcfit has completed the number of steps')
                 elif self.wavebin['mcfit']['chain'].shape[1] < self.inputs.nsteps:
                     self.speak('extending mcfit for more steps')
-                    self.runFullFit_dynesty()
+                    self.runFullFit_emcee()
         else: 
             self.speak('running mcfit for wavelength bin {0}'.format(self.wavefile))
             if self.inputs.samplecode == 'emcee': self.runFullFit_emcee()
@@ -203,8 +206,8 @@ class FullFitter(Talker, Writer):
         self.mcmcbounds[1] = [i for i in self.inputs.freeparambounds[1]]
 
         for u in range(len(self.inputs.freeparamnames)):
-            if type(self.mcmcbounds[0][u]) == bool and self.mcmcbounds[0][u] == True: self.mcmcbounds[0][u] = self.wavebin['lmfit']['values'][u]-self.wavebin['lmfit']['uncs'][u]*25.
-            if type(self.mcmcbounds[1][u]) == bool and self.mcmcbounds[1][u] == True: self.mcmcbounds[1][u] = self.wavebin['lmfit']['values'][u]+self.wavebin['lmfit']['uncs'][u]*25.
+            if type(self.mcmcbounds[0][u]) == bool and self.mcmcbounds[0][u] == True: self.mcmcbounds[0][u] = self.wavebin['lmfit']['values'][u]-self.wavebin['lmfit']['uncs'][u]*10.
+            if type(self.mcmcbounds[1][u]) == bool and self.mcmcbounds[1][u] == True: self.mcmcbounds[1][u] = self.wavebin['lmfit']['values'][u]+self.wavebin['lmfit']['uncs'][u]*10.
         self.write('lower and upper bounds for mcmc walkers:')
         for b, name in enumerate(self.inputs.freeparamnames):
             self.write('    '+name + '    '+str(self.mcmcbounds[0][b])+'    '+str(self.mcmcbounds[1][b]))
@@ -256,9 +259,12 @@ class FullFitter(Talker, Writer):
         self.speak('running dynesty')
         #self.dsampler = dynhelp.dyn(self.detrender, self.inputs, self.wavebin, self.mcmcbounds, ndim)
 
-        self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, bound='multi', sample='slice', update_interval=float(ndim))
-        if ndim > 25: self.dsampler.run_nested(nlive_init=int(5*ndim), nlive_batch=int(5*ndim), wt_kwargs={'pfrac': 1.0}) # place 100% of the weight on the posterior, don't sample the evidence
-        else: self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
+        if ndim > 25: # use special inputs that will make run more efficient
+            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, bound='multi', sample='slice', update_interval=float(ndim))
+            self.dsampler.run_nested(nlive_init=int(5*ndim), nlive_batch=int(5*ndim), wt_kwargs={'pfrac': 1.0}) # place 100% of the weight on the posterior, don't sample the evidence
+        else: # use defaults
+            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, sample='slice')
+            self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
 
         quantiles = [_quantile(self.dsampler.results['samples'][:,i], [.16, .5, .84], weights=np.exp(self.dsampler.results['logwt'] - self.dsampler.results['logwt'][-1])) for i in range(len(self.inputs.freeparamnames))]
         self.mcparams = np.array(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), quantiles))
@@ -267,7 +273,13 @@ class FullFitter(Talker, Writer):
         self.wavebin['mcfit'] = {}
         self.wavebin['mcfit']['results'] = self.dsampler.results
         self.wavebin['mcfit']['values'] = self.mcparams
-        np.save(self.savewave, self.wavebin)
+
+        #print(self.dsampler.results)
+        print(self.mcparams)
+
+        #np.save(self.savewave, self.wavebin)
+        # try with a pickle
+        pickle.dump(self.wavebin, open(self.savewave, 'wb'))
 
         self.write('mcmc params:')
         self.write('     parameter        value                  plus                  minus')
