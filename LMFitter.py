@@ -213,6 +213,11 @@ class LMFitter(Talker, Writer):
 
         self.speak('done with lmfit for wavelength bin {0}'.format(self.wavefile))
 
+        if self.inputs.dividewhite and self.inputs.binlen=='all':
+            # save the transit model from the white light curve fit
+            self.speak('saving Twhite for later use by divide white routine')
+            np.save(self.inputs.saveas+'Twhite.npy', modelobj.batmanmodel)
+
     def limbdarkparams(self, wavestart, waveend):
         self.speak('using ldtk to derive limb darkening parameters')
         filters = BoxcarFilter('a', wavestart, waveend),     # Define passbands - Boxcar filters for transmission spectroscopy

@@ -124,11 +124,17 @@ class LCMaker(Talker, Writer):
 
                     # make list of lightcurves and compcubes used for detrending for each night in subdirectories
                     if self.n == 0: 
-                        bin['lc'] = [(raw_counts_targ/np.mean(raw_counts_targ))/(raw_counts_comps/np.mean(raw_counts_comps))]
+                        bin['lc'] = [raw_counts_targ/raw_counts_comps]
                         bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
                     else: 
-                        bin['lc'].append((raw_counts_targ/np.mean(raw_counts_targ))/(raw_counts_comps/np.mean(raw_counts_comps)))
+                        bin['lc'].append(raw_counts_targ/raw_counts_comps)
                         bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
+
+                if self.inputs.dividewhite and self.inputs.binlen!='all':
+                    self.speak('creating Zwhite(t) for bin')
+                    Twhite = np.load('Twhite.npy')[()]
+                    if self.n == 0: bin['Zwhite'] = [raw_counts_targ/Twhite[self.n]]
+                    else: bin['Zwhite'].append(raw_counts_targ/Twhite[self.n])
 
 
                 np.save(self.inputs.saveas+wavefile, bin)
@@ -137,3 +143,9 @@ class LCMaker(Talker, Writer):
                 plot = Plotter(self.inputs, self.subcube)
                 plot.lcplots(bin)
 
+                if self.inputs.dividewhite and self.inputs.binlen=='all':
+                    # save the comparison star white light curves
+                    self.speak('creating Zwhite(t) for bin')
+                    Twhite = np.load('Twhite.npy')[()]
+                    if self.n == 0: bin['Zwhite'] = [raw_counts_targ/Twhite[self.n]]
+                    else: bin['Zwhite'].append(raw_counts_targ/Twhite[self.n])
