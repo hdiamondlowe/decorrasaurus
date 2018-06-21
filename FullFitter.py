@@ -267,19 +267,16 @@ class FullFitter(Talker, Writer):
             self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
 
         quantiles = [_quantile(self.dsampler.results['samples'][:,i], [.16, .5, .84], weights=np.exp(self.dsampler.results['logwt'] - self.dsampler.results['logwt'][-1])) for i in range(len(self.inputs.freeparamnames))]
-        self.mcparams = np.array(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), quantiles))
+        self.mcparams = np.array(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), quantiles))) # had to add list() for python3
 
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['mcfit'] = {}
         self.wavebin['mcfit']['results'] = self.dsampler.results
         self.wavebin['mcfit']['values'] = self.mcparams
 
-        #print(self.dsampler.results)
-        print(self.mcparams)
-
-        #np.save(self.savewave, self.wavebin)
+        np.save(self.savewave, self.wavebin)
         # try with a pickle
-        pickle.dump(self.wavebin, open(self.savewave, 'wb'))
+        #dill.dump(self.wavebin, open(self.savewave+'.p', 'wb'))
 
         self.write('mcmc params:')
         self.write('     parameter        value                  plus                  minus')
@@ -307,7 +304,7 @@ class FullFitter(Talker, Writer):
             self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]])))
         self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) for n in range(len(self.inputs.nightname))])))
 
-        plot = Plotter(self.inputs, self.cube)
+        plot = Plotter(self.inputs, self.subcube)
         plot.mcplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
