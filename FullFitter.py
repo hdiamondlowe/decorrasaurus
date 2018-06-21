@@ -13,8 +13,6 @@ from .Plotter import Plotter
 import multiprocessing
 from scipy import stats
 import scipy.interpolate as interpolate
-import dill
-import pickle
 #import emceehelper as mc
 
 class FullFitter(Talker, Writer):
@@ -275,8 +273,6 @@ class FullFitter(Talker, Writer):
         self.wavebin['mcfit']['values'] = self.mcparams
 
         np.save(self.savewave, self.wavebin)
-        # try with a pickle
-        #dill.dump(self.wavebin, open(self.savewave+'.p', 'wb'))
 
         self.write('mcmc params:')
         self.write('     parameter        value                  plus                  minus')
