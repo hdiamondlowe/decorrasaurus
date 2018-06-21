@@ -118,9 +118,9 @@ class LCMaker(Talker, Writer):
 
                     # make a lightcurves to work off of
                     raw_counts_targ = np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1) # shape = (numexps)
-                    raw_counts_targ = raw_counts_targ/np.mean(raw_counts_targ)
-                    raw_counts_comps = np.sum(np.sum([self.subcube[self.n]['raw_counts'][comparisons[i]] * bininds for i in range(len(comparisons))], 0), 1)
-                    raw_counts_comps = raw_counts_comps/np.mean(raw_counts_comps)
+                    raw_counts_targ = raw_counts_targ/np.median(raw_counts_targ)
+                    raw_counts_comps = np.sum(np.sum([self.subcube[self.n]['raw_counts'][c] * bininds for c in comparisons], 0), 1)
+                    raw_counts_comps = raw_counts_comps/np.median(raw_counts_comps)
 
                     # make list of lightcurves and compcubes used for detrending for each night in subdirectories
                     if self.n == 0: 
@@ -130,12 +130,25 @@ class LCMaker(Talker, Writer):
                         bin['lc'].append(raw_counts_targ/raw_counts_comps)
                         bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
-                if self.inputs.dividewhite and self.inputs.binlen!='all':
-                    self.speak('creating Zwhite(t) for bin')
-                    Twhite = np.load('Twhite.npy')[()]
-                    if self.n == 0: bin['Zwhite'] = [raw_counts_targ/Twhite[self.n]]
-                    else: bin['Zwhite'].append(raw_counts_targ/Twhite[self.n])
+                    if self.inputs.dividewhite and self.inputs.binlen!='all':
+                        
+                        self.dividewhite = np.load(self.inputs.saveas+'dividewhite.npy')[()]
+                        self.speak('creating Zwhite(t) for bin')
+                        Twhite = self.dividewhite['Twhite']
+                        Zwhite = np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1)/Twhite[self.n]
+                        if self.n == 0: bin['Zwhite'] = Zwhite/np.median(Zwhite)
+                        else: bin['Zwhite'].append(Zwhite/np.median(Zwhite))
 
+                        compwhitelcs = self.dividewhite['compwhitelcs'][self.n]
+                        #Zcomp = 
+
+                    if self.inputs.dividewhite and self.inputs.binlen=='all':
+                        # save the comparison star white light curves
+                        self.speak('creating divide white file for later use')
+                        self.dividewhite = {}
+                        if self.n == 0: self.dividewhite['compwhitelcs'] = [np.sum(self.subcube[self.n]['raw_counts'][c], 1) for c in comparisons]
+                        else: self.dividewhite['compwhitelcs'].append([np.sum(self.subcube[self.n]['raw_counts'][c], 1) for c in comparisons])
+                        np.save(self.inputs.saveas+'dividewhite.npy', self.dividewhite)
 
                 np.save(self.inputs.saveas+wavefile, bin)
                 self.speak('saved dictionary for wavelength bin {0}'.format(wavefile))
@@ -143,9 +156,4 @@ class LCMaker(Talker, Writer):
                 plot = Plotter(self.inputs, self.subcube)
                 plot.lcplots(bin)
 
-                if self.inputs.dividewhite and self.inputs.binlen=='all':
-                    # save the comparison star white light curves
-                    self.speak('creating Zwhite(t) for bin')
-                    Twhite = np.load('Twhite.npy')[()]
-                    if self.n == 0: bin['Zwhite'] = [raw_counts_targ/Twhite[self.n]]
-                    else: bin['Zwhite'].append(raw_counts_targ/Twhite[self.n])
+

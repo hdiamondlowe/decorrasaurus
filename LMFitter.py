@@ -215,8 +215,10 @@ class LMFitter(Talker, Writer):
 
         if self.inputs.dividewhite and self.inputs.binlen=='all':
             # save the transit model from the white light curve fit
+            self.dividewhite = np.load(self.inputs.saveas+'dividewhite.npy')[()]
             self.speak('saving Twhite for later use by divide white routine')
-            np.save(self.inputs.saveas+'Twhite.npy', modelobj.batmanmodel)
+            self.dividewhite['Twhite'] = modelobj.batmanmodel
+            np.save(self.inputs.saveas+'dividewhite.npy', self.dividewhite)
 
     def limbdarkparams(self, wavestart, waveend):
         self.speak('using ldtk to derive limb darkening parameters')
