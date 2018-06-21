@@ -217,9 +217,9 @@ class Plotter(Talker):
         self.wavebin = wavebin
         self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
 
-        self.speak('making mcfit figures')
+        self.speak('making fullfit figures')
 
-        if self.inputs.mcmccode == 'emcee':        
+        if self.inputs.samplecode == 'emcee':        
 
             self.speak('plotting walkers vs steps')
             fig, axes = plt.subplots(len(self.inputs.freeparamnames), 1, sharex=True, figsize=(16, 12))
@@ -252,12 +252,16 @@ class Plotter(Talker):
             plt.clf()
             plt.close()
 
-        elif self.inputs.mcmccode == 'dynesty':
+        elif self.inputs.samplecode == 'dynesty':
 
-            truths = self.wavebin['lmfit']['values']
+            truths = self.wavebin['lmfit']['values'][:]
+            u0ind = int(np.where(np.array(self.inputs.freeparamnames) == 'u00')[0])
+            truths.append(self.inputs.freeparamvalues[u0ind])
+            truths.append(self.inputs.freeparamvalues[u0ind+1])
             for n in range(len(self.inputs.nightname)): truths.append(1)
 
             # trace plot
+            self.speak('plotting dynesty trace plots')
             fig, axes = dyplot.traceplot(self.wavebin['mcfit']['results'], labels=self.inputs.freeparamnames, post_color='royalblue', truths=truths, truth_color='firebrick', truth_kwargs={'alpha': 0.8}, fig=plt.subplots(len(self.inputs.freeparamnames), 2, figsize=(12, 30)), trace_kwargs={'edgecolor':'none'})
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcmcchains.png')
             plt.clf()
@@ -282,18 +286,17 @@ class Plotter(Talker):
 
         modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
         models = modelobj.makemodel()
-        self.speak('plotting mcfit detrended lightcurve with batman model vs time')
+        self.speak('plotting fullfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n]/modelobj.fitmodel[n], 'o', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
         for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n], 'k-', lw=2)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (modelobj.batmanmodel[n])[self.wavebin['binnedok'][n]], 'k-', lw=2)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
-        plt.title('mcfit for fit, '+self.wavefile+' angstroms', fontsize=20)
+        plt.title('fullfit for fit, '+self.wavefile+' angstroms', fontsize=20)
         plt.tight_layout()
-        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcfitdetrendedlc.png')
+        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_fullfitdetrendedlc.png')
         plt.clf()
         plt.close()
-
 

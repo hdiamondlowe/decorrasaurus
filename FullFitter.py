@@ -301,7 +301,7 @@ class FullFitter(Talker, Writer):
         self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) for n in range(len(self.inputs.nightname))])))
 
         plot = Plotter(self.inputs, self.subcube)
-        plot.mcplots(self.wavebin)
+        plot.fullplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
 
