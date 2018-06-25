@@ -18,7 +18,13 @@ class WaveBinner(Talker):
         for n, subdir in enumerate(self.directories):
             self.n = n
             self.subdir = subdir
-            if 'wavebin' in self.subcube[self.n].keys():
+            if self.inputs.dividewhite:
+                # if divide white want to make new wavelims when switching from binlen='all' to binlen='200'
+                self.speak('making wavebins for divide white')
+                self.makeBinIndices()
+                self.speak('saving wavebin properties to the subcube')
+                np.save(self.inputs.saveas+'subcube.npy', self.subcube)
+            elif 'wavebin' in self.subcube[self.n].keys():
                 self.speak('reading in wavebin parameters from subcube saved in {0}'.format(self.detrender.directoryname))
                 self.binindices.append(self.subcube[self.n]['wavebin']['binindices'])
                 if self.n == 0:

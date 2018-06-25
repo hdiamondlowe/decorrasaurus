@@ -68,7 +68,8 @@ class ModelMaker(Talker):
         #print [tranvalues[n]['dt'] for n in range(len(self.inputs.nightname))]
         #print(self.params)
 
-        if self.inputs.istarget == True and self.inputs.isasymm == False:
+        # make the transit model with batman; or some alternative
+        if self.inputs.istarget and not self.inputs.isasymm:
             self.batmanmodel = []
             for n, night in enumerate(self.inputs.nightname):
                 batman = BatmanLC(times=self.wavebin['compcube'][n]['bjd'], t0=(self.inputs.toff[n]+tranvalues[n]['dt']), 
@@ -77,7 +78,7 @@ class ModelMaker(Talker):
                 batmanmodel = batman.batman_model()
                 if n == 0 and np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
                 self.batmanmodel.append(batmanmodel)
-        if self.inputs.istarget == True and self.inputs.isasymm == True:
+        elif self.inputs.istarget and self.inputs.isasymm:
             rp, tau0, tau1, tau2 = [], [], [], []
             numtau = 0
             for k in tranvalues.keys():
@@ -93,10 +94,13 @@ class ModelMaker(Talker):
             for i in range(len(tau0)):
                 F -= 2.*rp[i] * (np.exp((t-tau0[i])/tau2[i]) + np.exp(-(t-tau0[i])/tau1[i]))**(-1)
             self.batmanmodel = F
-        elif self.inputs.istarget == False:
+        elif not self.inputs.istarget:
             self.batmanmodel = []
             for n, night in enumerate(self.inputs.nightname):
                 self.batmanmodel.append(np.ones_like(self.wavebin['compcube'][n]['bjd']))
-        #if self.dividewhite == True: return self.fit_model*self.batman_model*self.Zwhite[self.binnedok]*self.Zlambdat[self.binnedok]
-        return np.array(self.fitmodel)*np.array(self.batmanmodel)
+
+        # models to return
+        if self.inputs.dividewhite and self.inputs.binlen!='all': 
+            return np.array(self.fitmodel)*np.array(self.batmanmodel)*np.array(self.wavebin['Zwhite'])*np.array(self.wavebin['Zcomp'])
+        else: return np.array(self.fitmodel)*np.array(self.batmanmodel)
 

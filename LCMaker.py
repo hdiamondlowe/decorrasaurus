@@ -123,24 +123,14 @@ class LCMaker(Talker, Writer):
                     raw_counts_comps = raw_counts_comps/np.median(raw_counts_comps)
 
                     # make list of lightcurves and compcubes used for detrending for each night in subdirectories
-                    if self.n == 0: 
-                        bin['lc'] = [raw_counts_targ/raw_counts_comps]
-                        bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
-                    else: 
-                        bin['lc'].append(raw_counts_targ/raw_counts_comps)
-                        bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
-
-                    if self.inputs.dividewhite and self.inputs.binlen!='all':
-                        
-                        self.dividewhite = np.load(self.inputs.saveas+'dividewhite.npy')[()]
-                        self.speak('creating Zwhite(t) for bin')
-                        Twhite = self.dividewhite['Twhite']
-                        Zwhite = np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1)/Twhite[self.n]
-                        if self.n == 0: bin['Zwhite'] = Zwhite/np.median(Zwhite)
-                        else: bin['Zwhite'].append(Zwhite/np.median(Zwhite))
-
-                        compwhitelcs = self.dividewhite['compwhitelcs'][self.n]
-                        #Zcomp = 
+                    #if self.n == 0: 
+                    #    bin['lc'] = [raw_counts_targ/raw_counts_comps]
+                    #    bin['raw_counts_targ'] = [raw_counts_targ]
+                    #    bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
+                    #else: 
+                    #    bin['lc'].append(raw_counts_targ/raw_counts_comps)
+                    #    bin['raw_counts_targ'].append(raw_counts_targ)
+                    #    bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
                     if self.inputs.dividewhite and self.inputs.binlen=='all':
                         # save the comparison star white light curves
@@ -149,6 +139,51 @@ class LCMaker(Talker, Writer):
                         if self.n == 0: self.dividewhite['compwhitelcs'] = [np.sum(self.subcube[self.n]['raw_counts'][c], 1) for c in comparisons]
                         else: self.dividewhite['compwhitelcs'].append([np.sum(self.subcube[self.n]['raw_counts'][c], 1) for c in comparisons])
                         np.save(self.inputs.saveas+'dividewhite.npy', self.dividewhite)
+
+                        if self.n == 0: 
+                            bin['lc'] = [raw_counts_targ/raw_counts_comps]
+                            bin['raw_counts_targ'] = [raw_counts_targ]
+                            bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
+                        else: 
+                            bin['lc'].append(raw_counts_targ/raw_counts_comps)
+                            bin['raw_counts_targ'].append(raw_counts_targ)
+                            bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
+
+
+                    elif self.inputs.dividewhite and self.inputs.binlen!='all':
+                        
+                        self.dividewhite = np.load(self.inputs.saveas+'dividewhite.npy')[()]
+                        self.speak('creating Zwhite(t) for bin')
+                        Twhite = self.dividewhite['Twhite']
+                        Zwhite = np.sum(self.subcube[self.n]['raw_counts'][target] * bininds, 1)/Twhite[self.n]
+                        if self.n == 0: bin['Zwhite'] = [Zwhite/np.median(Zwhite)]
+                        else: bin['Zwhite'].append(Zwhite/np.median(Zwhite))
+
+                        compwhitelcs = np.array(self.dividewhite['compwhitelcs'][self.n])
+                        complcs = np.array([np.sum(self.subcube[self.n]['raw_counts'][c] * bininds, 1) for c in comparisons])
+                        Zcomp = np.sum(complcs/compwhitelcs, 0)
+                        if self.n == 0: bin['Zcomp'] = [Zcomp/np.median(Zcomp)]
+                        else: bin['Zcomp'].append(Zcomp/np.median(Zcomp))
+
+                        # don't use comparion star for divide white:
+                        if self.n == 0: 
+                            bin['lc'] = [raw_counts_targ]
+                            bin['raw_counts_targ'] = [raw_counts_targ]
+                            bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
+                        else: 
+                            bin['lc'].append(raw_counts_targ)
+                            bin['raw_counts_targ'].append(raw_counts_targ)
+                            bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
+
+                    else:
+                        if self.n == 0: 
+                            bin['lc'] = [raw_counts_targ/raw_counts_comps]
+                            bin['raw_counts_targ'] = [raw_counts_targ]
+                            bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
+                        else: 
+                            bin['lc'].append(raw_counts_targ/raw_counts_comps)
+                            bin['raw_counts_targ'].append(raw_counts_targ)
+                            bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
                 np.save(self.inputs.saveas+wavefile, bin)
                 self.speak('saved dictionary for wavelength bin {0}'.format(wavefile))
