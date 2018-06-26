@@ -48,7 +48,6 @@ class LMFitter(Talker, Writer):
             if self.inputs.freeparambounds[1][n] == True: maxbound = None
             else: maxbound = self.inputs.freeparambounds[1][n]
             lmfitparams[name].set(min=minbound, max=maxbound)
-        print(lmfitparams)
 
         def lineareqn(params):
             paramvals = [params[name].value for name in self.inputs.freeparamnames]
