@@ -149,16 +149,15 @@ class Plotter(Talker):
             # plot the points that were used in the fit
             lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], self.wavebin['lc'][n][self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
             # plot the points that were not used
-            lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+            #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=20)
 
             lcplots['residuals'][0].plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]-models[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
-            lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+            #lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
             lcplots['residuals'][0].set_xlabel('bjd-'+str(t0), fontsize=20)
             lcplots['residuals'][0].set_ylabel('residuals', fontsize=20)
-
             plt.suptitle(self.inputs.nightname[n]+'lightcurve plus lmfit model, '+self.wavefile+' angstroms')
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitlcplusmodel_'+self.inputs.nightname[n]+'.png')
             plt.clf()
@@ -168,7 +167,7 @@ class Plotter(Talker):
         plt.figure()
         for n, night in enumerate(self.inputs.subdirectories):
             plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
-            plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+            #plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
         for n, night in enumerate(self.inputs.subdirectories):
             #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
             plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
