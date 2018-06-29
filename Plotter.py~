@@ -196,6 +196,7 @@ class Plotter(Talker):
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
             plt.clf()
             plt.close()
+>>>>>>> divideWhite
 
         
         self.speak('plotting fit residual histogram')
