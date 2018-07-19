@@ -19,7 +19,7 @@ class WaveBinner(Talker):
             self.n = n
             self.subdir = subdir
             if self.inputs.dividewhite:
-                # if divide white want to make new wavelims when switching from binlen='all' to binlen='200'
+                # if divideWhite want to make new wavelims when switching from binlen='all' to binlen='200'
                 self.speak('making wavebins for divide white')
                 self.makeBinIndices()
                 self.speak('saving wavebin properties to the subcube')
