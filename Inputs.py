@@ -240,6 +240,7 @@ class Inputs(Talker):
             self.istarget = str_to_bool(dictionary['istarget'])
             self.isasymm = str_to_bool(dictionary['isasymm'])
             self.invvar = str_to_bool(dictionary['invvar'])
+            self.dividewhite = str_to_bool(dictionary['dividewhite'])
             self.ldmodel = str_to_bool(dictionary['ldmodel'])
             self.domcmc = str_to_bool(dictionary['domcmc'])
             self.makeplots = str_to_bool(dictionary['makeplots'])

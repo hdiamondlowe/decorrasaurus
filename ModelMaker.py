@@ -99,5 +99,8 @@ class ModelMaker(Talker):
             for n, night in enumerate(self.inputs.nightname):
                 self.batmanmodel.append(np.ones_like(self.wavebin['compcube'][n]['bjd']))
 
-        return np.array(self.fitmodel)*np.array(self.batmanmodel)
+        # models to return
+        if self.inputs.dividewhite and self.inputs.binlen!='all': 
+            return np.array(self.fitmodel)*np.array(self.batmanmodel)*np.array(self.wavebin['Zwhite'])*np.array(self.wavebin['Zcomp'])
+        else: return np.array(self.fitmodel)*np.array(self.batmanmodel)
 

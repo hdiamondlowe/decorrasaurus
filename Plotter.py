@@ -164,22 +164,38 @@ class Plotter(Talker):
             plt.clf()
             plt.close()
 
-        self.speak('plotting lmfit detrended lightcurve with batman model vs time')
-        plt.figure()
-        for n, night in enumerate(self.inputs.subdirectories):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
-            #plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
-        for n, night in enumerate(self.inputs.subdirectories):
-            #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
-            plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
-        plt.xlabel('time from mid-transit [days]', fontsize=20)
-        plt.ylabel('normalized flux', fontsize=20)
-        plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
-        plt.tight_layout()
-        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
-        plt.clf()
-        plt.close()
-
+        if self.inputs.dividewhite and self.inputs.binlen!='all':
+            self.speak('plotting divide white lmfit detrended lightcurve with batman model vs time')
+            plt.figure()
+            for n, night in enumerate(self.inputs.subdirectories):
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/(modelobj.fitmodel[n]*self.wavebin['Zwhite'][n]*self.wavebin['Zcomp'][n]))[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+                #plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/(modelobj.fitmodel[n]*self.wavebin['Zwhite'][n]*self.wavebin['Zcomp'][n]))[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+            for n, night in enumerate(self.inputs.subdirectories):
+                #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
+                plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
+            plt.xlabel('time from mid-transit [days]', fontsize=20)
+            plt.ylabel('normalized flux', fontsize=20)
+            plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
+            plt.tight_layout()
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
+            plt.clf()
+            plt.close()
+        else:
+            self.speak('plotting lmfit detrended lightcurve with batman model vs time')
+            plt.figure()
+            for n, night in enumerate(self.inputs.subdirectories):
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+                #plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+            for n, night in enumerate(self.inputs.subdirectories):
+                #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
+                plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
+            plt.xlabel('time from mid-transit [days]', fontsize=20)
+            plt.ylabel('normalized flux', fontsize=20)
+            plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
+            plt.tight_layout()
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
+            plt.clf()
+            plt.close()
         
         self.speak('plotting fit residual histogram')
         dist = []
