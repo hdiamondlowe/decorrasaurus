@@ -225,7 +225,46 @@ class Plotter(Talker):
         plt.clf()
         plt.close()
         
-
+        self.speak('making rms vs binsize figure after lmfit')
+        for n, night in enumerate(self.inputs.subdirectories):
+            time = (self.subcube[n]['bjd'] - t0[n])[self.wavebin['binnedok'][n]]     # days
+            time = time*24.*60.                       # time now in minutes
+            sigma_resid = np.std((self.wavebin['lc'][n]-models[n])[self.wavebin['binnedok'][n]])
+            numbins = 1
+            bins = []
+            rms = []
+            gaussianrms = []
+            for i in range(len(time)):
+                hist = np.histogram(time, numbins)
+                ind_bins, time_bins = hist[0], hist[1]      # number of points in each bin (also helps index), bin limits in units of time [days]
+                dtime = time_bins[1]-time_bins[0]
+                if dtime < (0.5*self.inputs.Tdur*24.*60.):
+                    indlow = 0
+                    num = 0
+                    for i in ind_bins:
+                        num += np.power((np.mean(self.wavebin['lc'][n][self.wavebin['binnedok'][n]][indlow:indlow+i] - models[n][self.wavebin['binnedok'][n]][indlow:indlow+i])), 2.)
+                        indlow += i
+                    calc_rms = np.sqrt(num/numbins)
+                    if np.isfinite(calc_rms) != True: 
+                        numbins +=1 
+                        continue
+                    rms.append(calc_rms)
+                    bins.append(dtime)    # bin size in units of days
+                    gaussianrms.append(sigma_resid/np.sqrt(np.mean(ind_bins)))
+                numbins += 1
+            plt.loglog(np.array(bins), gaussianrms, 'r', lw=2, label='std. err.')
+            plt.loglog(np.array(bins), rms, 'k', lw=2, label='rms')
+            plt.xlim(bins[-1], bins[0])
+            plt.xlabel('bins [minutes]')
+            plt.ylabel('rms')
+            plt.title('rms vs binsize for wavelengths {0}'.format(self.wavefile))
+            plt.legend(loc='best')
+            plt.tight_layout()
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitrmsbinsize.png')
+            plt.clf()
+            plt.close()
+  
+        
         plt.close('all')
 
     def fullplots(self, wavebin):
