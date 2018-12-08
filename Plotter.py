@@ -274,6 +274,31 @@ class Plotter(Talker):
 
         self.speak('making fullfit figures')
 
+        t0 = []
+        for n, night in enumerate(self.inputs.nightname):
+            if 'dt'+str(n) in self.inputs.freeparamnames:
+                dtind = int(np.where(np.array(self.inputs.freeparamnames) == 'dt'+str(n))[0])
+                t0.append(self.inputs.toff[n] + self.wavebin['mcfit']['values'][dtind][0])
+            else:
+                dtind = int(np.where(np.array(self.inputs.tranlabels[n]) == 'dt')[0])
+                t0.append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
+
+        modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
+        models = modelobj.makemodel()
+        self.speak('plotting fullfit detrended lightcurve with batman model vs time')
+        plt.figure()
+        for n, night in enumerate(self.inputs.nightname):
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+        for n, night in enumerate(self.inputs.nightname):
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (modelobj.batmanmodel[n])[self.wavebin['binnedok'][n]], 'k-', lw=2)
+        plt.xlabel('time from mid-transit [days]', fontsize=20)
+        plt.ylabel('normalized flux', fontsize=20)
+        plt.title('fullfit for fit, '+self.wavefile+' angstroms', fontsize=20)
+        plt.tight_layout()
+        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_fullfitdetrendedlc.png')
+        plt.clf()
+        plt.close()
+
         if self.inputs.samplecode == 'emcee':        
 
             self.speak('plotting walkers vs steps')
@@ -318,7 +343,7 @@ class Plotter(Talker):
             # trace plot
             self.speak('plotting dynesty trace plots')
             fig, axes = dyplot.traceplot(self.wavebin['mcfit']['results'], labels=self.inputs.freeparamnames, post_color='royalblue', truths=truths, truth_color='firebrick', truth_kwargs={'alpha': 0.8}, fig=plt.subplots(len(self.inputs.freeparamnames), 2, figsize=(12, 30)), trace_kwargs={'edgecolor':'none'})
-            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_mcmcchains.png')
+            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_dynestychains.png')
             plt.clf()
             plt.close()
 
@@ -330,28 +355,4 @@ class Plotter(Talker):
             plt.close()
             '''
 
-        t0 = []
-        for n, night in enumerate(self.inputs.nightname):
-            if 'dt'+str(n) in self.inputs.freeparamnames:
-                dtind = int(np.where(np.array(self.inputs.freeparamnames) == 'dt'+str(n))[0])
-                t0.append(self.inputs.toff[n] + self.wavebin['mcfit']['values'][dtind][0])
-            else:
-                dtind = int(np.where(np.array(self.inputs.tranlabels[n]) == 'dt')[0])
-                t0.append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
-
-        modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
-        models = modelobj.makemodel()
-        self.speak('plotting fullfit detrended lightcurve with batman model vs time')
-        plt.figure()
-        for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
-        for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (modelobj.batmanmodel[n])[self.wavebin['binnedok'][n]], 'k-', lw=2)
-        plt.xlabel('time from mid-transit [days]', fontsize=20)
-        plt.ylabel('normalized flux', fontsize=20)
-        plt.title('fullfit for fit, '+self.wavefile+' angstroms', fontsize=20)
-        plt.tight_layout()
-        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_fullfitdetrendedlc.png')
-        plt.clf()
-        plt.close()
 

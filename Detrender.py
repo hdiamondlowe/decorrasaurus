@@ -31,6 +31,7 @@ class Detrender(Talker, Writer):
 
         self.subdirectories = [d for d in os.listdir('.') if os.path.isdir(os.path.join('.', d))]
         if 'run' in self.subdirectories: self.subdirectories.remove('run')
+        if 'notinuse' in self.subdirectories: self.subdirectories.remove('notinuse')
         self.subdirectories = sorted(self.subdirectories, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
 
         try: 
@@ -52,7 +53,7 @@ class Detrender(Talker, Writer):
         for w, wavefile in enumerate(self.lcs.wavebin.wavefiles):
             self.lmfit = LMFitter(self, wavefile)
 
-        if self.inputs.domcmc:
+        if self.inputs.fullsample:
             for wavefile in self.lcs.wavebin.wavefiles:
                 self.mcfit = FullFitter(self, wavefile)
 

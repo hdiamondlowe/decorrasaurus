@@ -258,7 +258,13 @@ class LMFitter(Talker, Writer):
         self.write('re-parameterized limb darkening params: '+str(self.v0)+' +/- '+str(self.v0_unc)+'    '+str(self.v1)+' +/- '+str(self.v1_unc))
 
         # save the re-parameterized limb_darkening values so that they can be recalled when making the model
-        self.wavebin['ldparams'] = [[self.v0, self.v1], [self.v0_unc, self.v1_unc]]
+
+        self.wavebin['ldparams'] = {}
+        self.wavebin['ldparams']['v0'] = self.v0
+        self.wavebin['ldparams']['v1'] = self.v1
+        self.wavebin['ldparams']['v0_unc'] = self.v0_unc
+        self.wavebin['ldparams']['v1_unc'] = self.v1_unc
+        #self.wavebin['ldparams'] = [[self.v0, self.v1], [self.v0_unc, self.v1_unc]]
         np.save(self.savewave, self.wavebin)
         self.speak('saved re-parameterized ld values and unertainties')
 

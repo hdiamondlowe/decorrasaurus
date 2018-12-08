@@ -39,6 +39,7 @@ class RunReader(Talker, Writer):
         # need the directory names as an input to Inputs
         self.subdirectories = [d for d in os.listdir('.') if os.path.isdir(os.path.join('.', d))]
         if 'run' in self.subdirectories: self.subdirectories.remove('run')
+        if 'notinuse' in self.subdirectories: self.subdirectories.remove('notinuse')
         #self.subdirectories = sorted(self.subdirectories, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
         self.subdirectories = [1]
 
@@ -63,6 +64,11 @@ class RunReader(Talker, Writer):
             result['wavelims'] = []
             result['midwave'] = []
             result['lightcurve'] = []
+            result['ldparams'] = {}
+            result['ldparams']['v0'] = []
+            result['ldparams']['v1'] = []
+            result['ldparams']['v0_unc'] = []
+            result['ldparams']['v1_unc'] = []
             result['binnedok'] = []
             result['fitmodel'] = []
             result['batmanmodel'] = []
@@ -75,13 +81,25 @@ class RunReader(Talker, Writer):
             for w in self.subcube[n]['wavebin']['wavefiles']:
                 binnedresult = np.load(self.rundirectory+w+'.npy')[()]
                 # this will not work when multiplt nights are involved - need to some how separate back into each night's values
+                if 'mcfit' in binnedresult.keys(): fit = 'mcfit'
+                else: fit = 'lmfit'
                 for i, p in enumerate(binnedresult['freeparams']):
-                    result[p].append(binnedresult['lmfit']['values'][i])
-                    result[p+'_unc'].append(binnedresult['lmfit']['uncs'][i])
+                    result[p].append(binnedresult[fit]['values'][i])
+                    result[p+'_unc'].append(binnedresult[fit]['uncs'][i])
                 result['wavelims'].append(binnedresult['wavelims'])
                 result['midwave'].append(np.mean(binnedresult['wavelims']))
                 # these are night- and wave-dependent; only want 1 night in there at a time
                 result['lightcurve'].append(binnedresult['lc'][n])
+                if fit == 'lmfit':
+                    result['ldparams']['v0'].append(binnedresult['ldparams']['v0'])
+                    result['ldparams']['v1'].append(binnedresult['ldparams']['v1'])
+                    result['ldparams']['v0_unc'].append(binnedresult['ldparams']['v0_unc'])
+                    result['ldparams']['v1_unc'].append(binnedresult['ldparams']['v1_unc'])
+                elif fit == 'mcfit':
+                    result['ldparams']['v0'].append(binnedresult[fit]['values'][-3])
+                    result['ldparams']['v1'].append(binnedresult[fit]['values'][-2])
+                    result['ldparams']['v0_unc'].append(np.mean(binnedresult[fit]['values'][-3]))
+                    result['ldparams']['v1_unc'].append(np.mean(binnedresult[fit]['values'][-2]))
                 result['binnedok'].append(binnedresult['binnedok'][n])
                 result['fitmodel'].append(binnedresult['lmfit']['fitmodels'][n])
                 result['batmanmodel'].append(binnedresult['lmfit']['batmanmodels'][n])

@@ -28,7 +28,6 @@ class FullFitter(Talker, Writer):
         self.subcube = self.detrender.cube.subcube
         self.wavefile = wavefile
         self.savewave = self.inputs.saveas+self.wavefile
-        print(self.savewave)
         
         Writer.__init__(self, self.savewave+'.txt')
 
@@ -176,14 +175,14 @@ class FullFitter(Talker, Writer):
         else: 
             # append u0+str(0) to the free paramnames
             self.inputs.freeparamnames.append('u00')
-            self.inputs.freeparamvalues.append(self.wavebin['ldparams'][0][0])
+            self.inputs.freeparamvalues.append(self.wavebin['ldparams']['v0'])
             # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
             self.inputs.freeparambounds[0].append(0.0)          
             self.inputs.freeparambounds[1].append(1.0)
             # append u1+str(0) to the free paramnames
             self.inputs.freeparamnames.append('u10')
-            self.inputs.freeparamvalues.append(self.wavebin['ldparams'][0][1])
-            self.inputs.freeparambounds[0].append(0.0)          
+            self.inputs.freeparamvalues.append(self.wavebin['ldparams']['v1'])
+            self.inputs.freeparambounds[0].append(0.0)
             self.inputs.freeparambounds[1].append(1.0)
             # need to re-set the boundary names so that ModelMaker will know to use the same 'u00' and 'u01' for all nights
             for n, night in enumerate(self.inputs.nightname):
@@ -232,9 +231,9 @@ class FullFitter(Talker, Writer):
         # inverse transform sampling    
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
         v = np.linspace(0, 1, 100000)
-        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams'][0][0], scale=self.wavebin['ldparams'][1][0])
+        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['v0'], scale=self.wavebin['ldparams']['v0_unc'])
         ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
-        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams'][0][1], scale=self.wavebin['ldparams'][1][1])
+        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['v1'], scale=self.wavebin['ldparams']['v1_unc'])
         ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
         def ptform(p):
             x = np.array(p)
@@ -270,7 +269,8 @@ class FullFitter(Talker, Writer):
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['mcfit'] = {}
         self.wavebin['mcfit']['results'] = self.dsampler.results
-        self.wavebin['mcfit']['values'] = self.mcparams
+        self.wavebin['mcfit']['values'] = self.mcparams[:,0]
+        self.wavebin['mcfit']['uncs'] = self.mcparams[:,1:]
 
         np.save(self.savewave, self.wavebin)
 
@@ -299,6 +299,11 @@ class FullFitter(Talker, Writer):
         for n, night in enumerate(self.inputs.nightname):
             self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]])))
         self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) for n in range(len(self.inputs.nightname))])))
+
+        self.wavebin['mcfit']['fitmodels'] = modelobj.fitmodel
+        self.wavebin['mcfit']['batmanmodels'] = modelobj.batmanmodel
+        # update fitted limb darkening parameters
+        
 
         plot = Plotter(self.inputs, self.subcube)
         plot.fullplots(self.wavebin)
