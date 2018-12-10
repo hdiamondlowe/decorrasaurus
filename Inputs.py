@@ -13,6 +13,7 @@ class Inputs(Talker):
         Talker.__init__(self)
 
         self.subdirectories = subdirectories
+        print(self.subdirectories)
 
         for n, subdir in enumerate(self.subdirectories):
             self.n = n
@@ -83,6 +84,7 @@ class Inputs(Talker):
         # be careful here! if for some reason the sorted list of your directories does not match up with the sorted list of the observation nights, you will introduce an error
         inputfilenames = sorted(inputfilenames)#, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
 
+        print(inputfilenames, self.directoryname)
         self.speak('reading {0} file from {1}'.format(inputfilenames[self.n], self.directoryname))
 
         file = open(self.directoryname+inputfilenames[self.n])
@@ -160,7 +162,7 @@ class Inputs(Talker):
             self.tranlabels = [dictionary['tranlabels']]
             self.tranparams = [[str_to_bool(i) for i in dictionary['tranparams']]]
             self.tranbounds = [[[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]]
-            self.wavelength_lims = [float(i) for i in dictionary['wavelength_lims']]
+            self.wavelength_lims = [[float(i) for i in dictionary['wavelength_lims']]]
             assert(len(self.tranbounds[self.n][0]) == len(self.tranlabels[self.n]) and len(self.tranbounds[self.n][1]) == len(self.tranlabels[self.n])), 'There is something wrong with the transit parameter bounds'
 
             self.fitparams = [[1 for f in self.fitlabels[self.n]]]
@@ -195,6 +197,9 @@ class Inputs(Talker):
             self.tranlabels.append(dictionary['tranlabels'])
             self.tranparams.append([str_to_bool(i) for i in dictionary['tranparams']])
             self.tranbounds.append([[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]])
+            if dictionary['wavelength_lims'] == 'Joint':
+                self.wavelength_lims.append(self.wavelength_lims[0])
+            else: self.wavelength_lims.append([float(i) for i in dictionary['wavelength_lims']])
 
             self.fitparams.append([1 for f in self.fitlabels[self.n]])
             self.polyparams.append([1 for p in self.polylabels[self.n]])

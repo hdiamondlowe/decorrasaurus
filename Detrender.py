@@ -32,7 +32,7 @@ class Detrender(Talker, Writer):
         self.subdirectories = [d for d in os.listdir('.') if os.path.isdir(os.path.join('.', d))]
         if 'run' in self.subdirectories: self.subdirectories.remove('run')
         if 'notinuse' in self.subdirectories: self.subdirectories.remove('notinuse')
-        self.subdirectories = sorted(self.subdirectories, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
+        self.subdirectories = sorted(self.subdirectories)
 
         try: 
             self.inputs = Inputs(self.subdirectories, self.directoryname)
