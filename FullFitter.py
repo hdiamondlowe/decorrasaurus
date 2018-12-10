@@ -271,7 +271,6 @@ class FullFitter(Talker, Writer):
         self.wavebin['mcfit']['results'] = self.dsampler.results
         self.wavebin['mcfit']['values'] = self.mcparams[:,0]
         self.wavebin['mcfit']['uncs'] = self.mcparams[:,1:]
-
         np.save(self.savewave, self.wavebin)
 
         self.write('mcmc params:')
@@ -302,7 +301,7 @@ class FullFitter(Talker, Writer):
 
         self.wavebin['mcfit']['fitmodels'] = modelobj.fitmodel
         self.wavebin['mcfit']['batmanmodels'] = modelobj.batmanmodel
-        # update fitted limb darkening parameters
+        np.save(self.savewave, self.wavebin)
         
 
         plot = Plotter(self.inputs, self.subcube)

@@ -90,8 +90,9 @@ class Plotter(Talker):
 
         self.speak('making model to offset bjd times')
         #lcbinned = self.targcomp_binned.binned_lcs_dict[self.keys[k]]
-        modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['lmfit']['values'])
-        models = modelobj.makemodel()
+        #modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['lmfit']['values'])
+        fitmodels, batmanmodels = self.wavebin['lmfit']['fitmodels'], self.wavebin['lmfit']['batmanmodels']
+        models = np.array(fitmodels)*np.array(batmanmodels)
 
         colors = ['C0', 'C1', 'C2', 'C3', 'C4', 'C8', 'C9']
 
@@ -168,11 +169,11 @@ class Plotter(Talker):
             self.speak('plotting divide white lmfit detrended lightcurve with batman model vs time')
             plt.figure()
             for n, night in enumerate(self.inputs.subdirectories):
-                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/(modelobj.fitmodel[n]*self.wavebin['Zwhite'][n]*self.wavebin['Zcomp'][n]))[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/(fitmodels[n]*self.wavebin['Zwhite'][n]*self.wavebin['Zcomp'][n]))[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
                 #plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/(modelobj.fitmodel[n]*self.wavebin['Zwhite'][n]*self.wavebin['Zcomp'][n]))[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             for n, night in enumerate(self.inputs.subdirectories):
                 #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
-                plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
+                plt.plot(self.subcube[n]['bjd']-t0[n], batmanmodels[n], 'k-', lw=2, alpha=0.5)
             plt.xlabel('time from mid-transit [days]', fontsize=20)
             plt.ylabel('normalized flux', fontsize=20)
             plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
@@ -184,11 +185,11 @@ class Plotter(Talker):
             self.speak('plotting lmfit detrended lightcurve with batman model vs time')
             plt.figure()
             for n, night in enumerate(self.inputs.subdirectories):
-                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+                plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/fitmodels[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
                 #plt.plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             for n, night in enumerate(self.inputs.subdirectories):
                 #plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], modelobj.batmanmodel[n][self.wavebin['binnedok'][n]], 'k-', lw=2, alpha=0.5)
-                plt.plot(self.subcube[n]['bjd']-t0[n], modelobj.batmanmodel[n], 'k-', lw=2, alpha=0.5)
+                plt.plot(self.subcube[n]['bjd']-t0[n], batmanmodels[n], 'k-', lw=2, alpha=0.5)
             plt.xlabel('time from mid-transit [days]', fontsize=20)
             plt.ylabel('normalized flux', fontsize=20)
             plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
@@ -272,25 +273,30 @@ class Plotter(Talker):
         self.wavebin = wavebin
         self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
 
+        fitmodels, batmanmodels = self.wavebin['mcfit']['fitmodels'], self.wavebin['mcfit']['batmanmodels']
+        models = np.array(fitmodels)*np.array(batmanmodels)
+
+        #modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
+        #models = modelobj.makemodel()
+
         self.speak('making fullfit figures')
 
         t0 = []
         for n, night in enumerate(self.inputs.nightname):
             if 'dt'+str(n) in self.inputs.freeparamnames:
                 dtind = int(np.where(np.array(self.inputs.freeparamnames) == 'dt'+str(n))[0])
-                t0.append(self.inputs.toff[n] + self.wavebin['mcfit']['values'][dtind][0])
+                t0.append(self.inputs.toff[n] + self.wavebin['mcfit']['values'][dtind])
             else:
                 dtind = int(np.where(np.array(self.inputs.tranlabels[n]) == 'dt')[0])
                 t0.append(self.inputs.toff[n] + self.inputs.tranparams[n][dtind])
 
-        modelobj = ModelMaker(self.inputs, self.wavebin, self.wavebin['mcfit']['values'][:,0])
-        models = modelobj.makemodel()
+
         self.speak('plotting fullfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/modelobj.fitmodel[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (self.wavebin['lc'][n]/fitmodels[n])[self.wavebin['binnedok'][n]], 'o', markeredgecolor='none', alpha=0.5)
         for n, night in enumerate(self.inputs.nightname):
-            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (modelobj.batmanmodel[n])[self.wavebin['binnedok'][n]], 'k-', lw=2)
+            plt.plot(self.subcube[n]['bjd'][self.wavebin['binnedok'][n]]-t0[n], (batmanmodels[n])[self.wavebin['binnedok'][n]], 'k-', lw=2)
         plt.xlabel('time from mid-transit [days]', fontsize=20)
         plt.ylabel('normalized flux', fontsize=20)
         plt.title('fullfit for fit, '+self.wavefile+' angstroms', fontsize=20)
@@ -306,13 +312,13 @@ class Plotter(Talker):
             for i, name in enumerate(self.inputs.freeparamnames):
                 axes[i].plot(self.wavebin['mcfit']['chain'][:, :, i].T, color="k", alpha=0.4)
                 axes[i].yaxis.set_major_locator(MaxNLocator(5))
-                axes[i].axhline(self.wavebin['mcfit']['values'][i][0], color="#4682b4", lw=2)
+                axes[i].axhline(self.wavebin['mcfit']['values'][i], color="#4682b4", lw=2)
                 if self.inputs.freeparambounds[0][i] == True:
-                    axes[i].axhline(self.wavebin['mcfit']['values'][i][0]-self.wavebin['lmfit']['uncs'][i], color="#4682b4", lw=2, ls='--')
+                    axes[i].axhline(self.wavebin['mcfit']['values'][i]-self.wavebin['lmfit']['uncs'][i], color="#4682b4", lw=2, ls='--')
                 else:
                     axes[i].axhline(self.inputs.freeparambounds[0][i], color="#4682b4", lw=2, ls='--')
                 if self.inputs.freeparambounds[1][i] == True:
-                    axes[i].axhline(self.wavebin['mcfit']['values'][i][0]+self.wavebin['lmfit']['uncs'][i], color="#4682b4", lw=2, ls='--')
+                    axes[i].axhline(self.wavebin['mcfit']['values'][i]+self.wavebin['lmfit']['uncs'][i], color="#4682b4", lw=2, ls='--')
                 else:
                     axes[i].axhline(self.inputs.freeparambounds[1][i], color="#4682b4", lw=2, ls='--')
                 axes[i].axvline(self.inputs.burnin, color='k', ls='--', lw=1, alpha=0.4)
