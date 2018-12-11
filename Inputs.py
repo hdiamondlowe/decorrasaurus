@@ -13,12 +13,12 @@ class Inputs(Talker):
         Talker.__init__(self)
 
         self.subdirectories = subdirectories
-        print(self.subdirectories)
 
         for n, subdir in enumerate(self.subdirectories):
             self.n = n
             self.subdir = subdir
             if directoryname:
+                print('directoryname:', directoryname)
                 self.speak('going into directory {0}'.format(directoryname[0]))
                 self.directoryname = directoryname[0]
                 self.readInputs()
@@ -68,6 +68,7 @@ class Inputs(Talker):
         else: 
             self.nightname.append(dictionary['nightname'])
         
+
         self.speak('copying {0} to directory {1}'.format(self.subdir+'/input.init', self.directoryname))
         copyfile(self.subdir+'/input.init', self.directoryname+self.nightname[self.n]+'_input.init')
         #copyfile(self.subdir+'/'+self.starlist[self.n], self.directoryname+self.nightname[self.n]+'_'+self.starlist[self.n])
@@ -84,7 +85,6 @@ class Inputs(Talker):
         # be careful here! if for some reason the sorted list of your directories does not match up with the sorted list of the observation nights, you will introduce an error
         inputfilenames = sorted(inputfilenames)#, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
 
-        print(inputfilenames, self.directoryname)
         self.speak('reading {0} file from {1}'.format(inputfilenames[self.n], self.directoryname))
 
         file = open(self.directoryname+inputfilenames[self.n])
@@ -111,12 +111,16 @@ class Inputs(Talker):
                     else: return str(s)
 
         if self.n == 0:
-            self.filename = dictionary['filename']
             self.saveas = self.directoryname
-            self.nightname = [dictionary['nightname']]
+            if len(self.nightname) != self.n+1:
+                self.filename = dictionary['filename']
+                self.nightname = [dictionary['nightname']]
 
         else:
-            self.nightname.append(dictionary['nightname'])
+            if len(self.nightname) != self.n+1:
+                self.nightname.append(dictionary['nightname'])
+
+        print(self.filename, self.saveas, self.nightname)
 
         # target and comparison list now designated in mosasaurus cube
 
@@ -146,15 +150,15 @@ class Inputs(Talker):
             self.toff = [self.T0 + self.P*self.epochnum[self.n]]
 
         else:
-            #self.fitlabels.append(dictionary['fitlabels'])
+            self.fitlabels.append(dictionary['fitlabels'])
             # quick hack to make testing go faster - all fit labels are the same for all nights so only set them for self.n = 0
-            self.speak( 'using hack to set all fitlabels to be the same as those from dataset0')
-            self.fitlabels.append(self.fitlabels[0])
+            #self.speak( 'using hack to set all fitlabels to be the same as those from dataset0')
+            #self.fitlabels.append(self.fitlabels[0])
             if type(self.fitlabels[self.n]) == str: self.fitlabels[self.n] = [self.fitlabels[self.n]]
-            #self.polyfit.append(int(dictionary['polyfit']))
+            self.polyfit.append(int(dictionary['polyfit']))
             # quick hack to make testing go faster - all fit labels are the same for all nights so only set them for self.n = 0
-            self.polyfit.append(self.polyfit[0])
-            self.polylabels.append([string.uppercase[x] for x in range(self.polyfit[self.n])])
+            #self.polyfit.append(self.polyfit[0])
+            self.polylabels.append([string.ascii_uppercase[x] for x in range(self.polyfit[self.n])])
             self.epochnum.append(int(dictionary['epochnum']))
             self.toff.append(self.T0 + self.P*self.epochnum[self.n])
 
