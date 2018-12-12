@@ -23,8 +23,9 @@ class ModelMaker(Talker):
                 poly.append(self.params[paramind])
             N = len(poly)
             polymodel = 0
+            time_array = (self.wavebin['compcube'][n]['bjd']-self.inputs.toff[n])/(self.wavebin['compcube'][n]['bjd'][-1] - self.wavebin['compcube'][n]['bjd'][0])
             while N > 0:
-                polymodel += poly[N-1]*(self.wavebin['compcube'][n]['bjd']-self.inputs.toff[n])**(N-1)
+                polymodel += poly[N-1]*(time_array)**(N-1)
                 N -= 1
             x = []
             for flabel in self.inputs.fitlabels[n]:

@@ -19,7 +19,10 @@ class RunReader(Talker, Writer):
         # decide whether or not this Reducer is chatty
         Talker.__init__(self)
 
+        print(type(rundirectory[0]))
+
         if rundirectory: 
+            
             self.rundirectory = str(rundirectory[0])
             self.speak('the run reader is starting in directory {0}'.format(self.rundirectory))
 
@@ -83,19 +86,22 @@ class RunReader(Talker, Writer):
                 # this will not work when multiplt nights are involved - need to some how separate back into each night's values
                 if 'mcfit' in binnedresult.keys(): fit = 'mcfit'
                 else: fit = 'lmfit'
-                for i, p in enumerate(binnedresult['freeparams']):
-                    result[p].append(binnedresult[fit]['values'][i])
-                    result[p+'_unc'].append(binnedresult[fit]['uncs'][i])
                 result['wavelims'].append(binnedresult['wavelims'])
                 result['midwave'].append(np.mean(binnedresult['wavelims']))
                 # these are night- and wave-dependent; only want 1 night in there at a time
                 result['lightcurve'].append(binnedresult['lc'][n])
                 if fit == 'lmfit':
+                    for i, p in enumerate(binnedresult['freeparams']):
+                        result[p].append(binnedresult[fit]['values'][i])
+                        result[p+'_unc'].append(binnedresult[fit]['uncs'][i])
                     result['ldparams']['v0'].append(binnedresult['ldparams']['v0'])
                     result['ldparams']['v1'].append(binnedresult['ldparams']['v1'])
                     result['ldparams']['v0_unc'].append(binnedresult['ldparams']['v0_unc'])
                     result['ldparams']['v1_unc'].append(binnedresult['ldparams']['v1_unc'])
                 elif fit == 'mcfit':
+                    for i, p in enumerate(binnedresult['freeparams']):
+                        result[p].append(binnedresult[fit]['values'][i])
+                        result[p+'_unc'].append(np.mean(binnedresult[fit]['uncs'][i]))
                     result['ldparams']['v0'].append(binnedresult[fit]['values'][-3])
                     result['ldparams']['v1'].append(binnedresult[fit]['values'][-2])
                     result['ldparams']['v0_unc'].append(np.mean(binnedresult[fit]['values'][-3]))
