@@ -43,15 +43,17 @@ class WaveBinner(Talker):
         numexps, numwave = len(self.subcube[self.n]['bjd']), len(self.subcube[self.n]['wavelengths'])
 
         if self.n == 0:
-            waverange = self.inputs.wavelength_lims[1] - self.inputs.wavelength_lims[0]
-            if self.inputs.binlen == 'all': self.binlen = waverange
-            else: self.binlen = self.inputs.binlen
-            self.numbins = int(np.floor(waverange/self.binlen))
-            self.binlen = waverange/float(self.numbins)
             self.wavelims = []
-            [self.wavelims.append((self.inputs.wavelength_lims[0]+(i*self.binlen), self.inputs.wavelength_lims[0]+((i+1)*self.binlen))) for i in range(int(self.numbins))]
-        binindices = np.zeros((self.numbins, numwave))
 
+        waverange = self.inputs.wavelength_lims[self.n][1] - self.inputs.wavelength_lims[self.n][0]
+        if self.inputs.binlen == 'all': self.binlen = waverange
+        else: self.binlen = self.inputs.binlen
+        self.numbins = int(np.floor(waverange/self.binlen))
+        self.binlen = waverange/float(self.numbins)
+        [self.wavelims.append([(self.inputs.wavelength_lims[self.n][0]+(i*self.binlen), self.inputs.wavelength_lims[self.n][0]+((i+1)*self.binlen))]) for i in range(int(self.numbins))]
+        binindices = np.zeros((self.numbins, numwave))
+        print(self.wavelims)
+        '''
         for i, wavelim in enumerate(self.wavelims):
             # make an array that will be a mask for the wavelength parameter; array of indices
             indarray = np.zeros(numwave)
@@ -85,5 +87,5 @@ class WaveBinner(Talker):
         self.subcube[self.n]['wavebin']['wavelims'] = self.wavelims
         if self.n == 0: self.wavefiles = [str(i[0])+'-'+str(i[1]) for i in self.wavelims]
         self.subcube[self.n]['wavebin']['wavefiles'] = self.wavefiles
-
+        '''
 
