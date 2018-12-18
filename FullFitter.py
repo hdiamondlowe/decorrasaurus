@@ -24,17 +24,17 @@ class FullFitter(Talker, Writer):
         Talker.__init__(self)
 
         self.detrender = detrender
-        self.inputs = self.detrender.inputs
+        self.inputs = self.detrender.inputs.inputs
         self.subcube = self.detrender.cube.subcube
         self.wavefile = wavefile
-        self.savewave = self.inputs.saveas+self.wavefile
+        self.savewave = self.inputs['directoryname']+self.wavefile
         
         Writer.__init__(self, self.savewave+'.txt')
 
         self.wavebin = np.load(self.savewave+'.npy')[()]
-        if 'mcfit' in self.wavebin.keys():
+        if self.wavebin['mcfitdone']:
             self.speak('mcfit already exists for wavelength bin {0}'.format(self.wavefile))
-            if self.inputs.samplecode == 'emcee':
+            if self.inputs['samplecode'] == 'emcee':
                 if self.wavebin['mcfit']['chain'].shape[1] == self.inputs.nsteps:
                     self.speak('mcfit has completed the number of steps')
                 elif self.wavebin['mcfit']['chain'].shape[1] < self.inputs.nsteps:
@@ -42,8 +42,8 @@ class FullFitter(Talker, Writer):
                     self.runFullFit_emcee()
         else: 
             self.speak('running mcfit for wavelength bin {0}'.format(self.wavefile))
-            if self.inputs.samplecode == 'emcee': self.runFullFit_emcee()
-            elif self.inputs.samplecode == 'dynesty': self.runFullFit_dynesty()
+            if self.inputs['samplecode']   == 'emcee':   self.runFullFit_emcee()
+            elif self.inputs['samplecode'] == 'dynesty': self.runFullFit_dynesty()
 
     def runFullFit_emcee(self):
 
@@ -171,63 +171,60 @@ class FullFitter(Talker, Writer):
     def runFullFit_dynesty(self):
 
         # limb darkening parameters were fixed in the Levenberg-Marquardt fits but now we want to fit for them
-        if 'u00' in self.inputs.freeparamnames: pass
-        else: 
-            # append u0+str(0) to the free paramnames
-            self.inputs.freeparamnames.append('u00')
-            self.inputs.freeparamvalues.append(self.wavebin['ldparams']['v0'])
-            # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
-            self.inputs.freeparambounds[0].append(0.0)          
-            self.inputs.freeparambounds[1].append(1.0)
-            # append u1+str(0) to the free paramnames
-            self.inputs.freeparamnames.append('u10')
-            self.inputs.freeparamvalues.append(self.wavebin['ldparams']['v1'])
-            self.inputs.freeparambounds[0].append(0.0)
-            self.inputs.freeparambounds[1].append(1.0)
-            # need to re-set the boundary names so that ModelMaker will know to use the same 'u00' and 'u01' for all nights
-            for n, night in enumerate(self.inputs.nightname):
-                if n == 0: self.inputs.tranbounds[n][0][-2], self.inputs.tranbounds[n][0][-1], self.inputs.tranbounds[n][1][-2], self.inputs.tranbounds[n][1][-1] = True, True, True, True
-                else: self.inputs.tranbounds[n][0][-2], self.inputs.tranbounds[n][0][-1], self.inputs.tranbounds[n][1][-2], self.inputs.tranbounds[n][1][-1] = 'Joint', 'Joint', 0.0, 0.0
+        self.freeparamnames = self.wavebin['lmfit']['freeparamnames']
+        self.freeparamvalues = self.wavebin['lmfit']['freeparamvalues']
+        self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
+
+        # append u0+str(0) to the free paramnames
+        self.freeparamnames = np.append(self.freeparamnames, 'u00')
+        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v0'])
+        # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
+        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+        # append u1+str(0) to the free paramnames
+        self.freeparamnames = np.append(self.freeparamnames, 'u10')
+        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v1'])
+        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
                 
         # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
-        for n, night in enumerate(self.inputs.nightname):
-            if 's'+str(n) in self.inputs.freeparamnames: pass
-            else:
-                self.inputs.freeparamnames.append('s'+str(n))
-                self.inputs.freeparamvalues.append(1)
-                self.inputs.freeparambounds[0].append(0.01)
-                self.inputs.freeparambounds[1].append(10.)
+        for subdir in self.wavebin['subdirectories']:
+            n = np.argwhere(np.array(self.inputs['subdirectories']) == subdir)[0][0]
+            self.freeparamnames = np.append(self.freeparamnames, 's'+str(n))
+            self.freeparamvalues = np.append(self.freeparamvalues, 1)
+            self.freeparambounds = np.append(self.freeparambounds, [[0.01], [10.]], axis=1)
+
+        self.wavebin['freeparamnames'] = self.freeparamnames
 
         self.mcmcbounds = [[],[]]
-        self.mcmcbounds[0] = [i for i in self.inputs.freeparambounds[0]]
-        self.mcmcbounds[1] = [i for i in self.inputs.freeparambounds[1]]
+        self.mcmcbounds[0] = [i for i in self.freeparambounds[0]]
+        self.mcmcbounds[1] = [i for i in self.freeparambounds[1]]
 
-        for u in range(len(self.inputs.freeparamnames)):
-            if type(self.mcmcbounds[0][u]) == bool and self.mcmcbounds[0][u] == True: self.mcmcbounds[0][u] = self.wavebin['lmfit']['values'][u]-self.wavebin['lmfit']['uncs'][u]*10.
-            if type(self.mcmcbounds[1][u]) == bool and self.mcmcbounds[1][u] == True: self.mcmcbounds[1][u] = self.wavebin['lmfit']['values'][u]+self.wavebin['lmfit']['uncs'][u]*10.
+        for i, name in enumerate(self.wavebin['lmfit']['freeparamnames']):
+            self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*10.
+            self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*10.
+
         self.write('lower and upper bounds for mcmc walkers:')
-        for b, name in enumerate(self.inputs.freeparamnames):
+        for b, name in enumerate(self.freeparamnames):
             self.write('    '+name + '    '+str(self.mcmcbounds[0][b])+'    '+str(self.mcmcbounds[1][b]))
 
         # rescaling uncertainties as a free parameter during the fit (Berta, et al. 2011, references therein)
         def lnlike(p):
             # test what the priors look like on their own
-            #rpind = int(np.where(np.array(self.inputs.freeparamnames) == 'rp'+str(0))[0])
+            #rpind = int(np.where(np.array(self.freeparamnames) == 'rp'+str(0))[0])
             #logl = -0.5 * ((p[rpind] - 0.05)/0.01)**2
             #return logl
             modelobj = ModelMaker(self.inputs, self.wavebin, p)
             models = modelobj.makemodel()
             logl = []
-            for n, night in enumerate(self.inputs.nightname):
+            for subdir in self.wavebin['subdirectories']:
+                n = self.inputs[subdir]['n']
                 # p[sind] is an 's' parameter; if the uncertainties do not need to be re-scaled then s = 1
                 # there is a single 's' parameter for each night's fit - helpful if a dataset is far from the photon noise
-                sind = int(np.where(np.array(self.inputs.freeparamnames) == 's'+str(n))[0])
-                penaltyterm = -len(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) * np.log(p[sind])
-                chi2 = (((self.wavebin['lc'][n] - models[n])/self.wavebin['photnoiseest'][n])[self.wavebin['binnedok'][n]])**2
+                sind = np.argwhere(np.array(self.freeparamnames) == 's'+n)[0][0]
+                penaltyterm = -len(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) * np.log(p[sind])
+                chi2 = (((self.wavebin[subdir]['lc'] - models[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])**2
                 logl.append(penaltyterm - 0.5*(1./(p[sind]**2))*np.sum(chi2))
             return np.sum(logl)
             
-
         # inverse transform sampling    
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
         v = np.linspace(0, 1, 100000)
@@ -238,11 +235,11 @@ class FullFitter(Talker, Writer):
         def ptform(p):
             x = np.array(p)
             for i in range(len(x)):
-                if self.inputs.freeparamnames[i] == 'u00':
+                if self.freeparamnames[i] == 'u00':
                     if x[i] < 0.0001: x[i] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
                     if x[i] > .9999: x[i] = .9999
                     x[i] = ppf_func_u0(x[i])
-                elif self.inputs.freeparamnames[i] == 'u10':
+                elif self.freeparamnames[i] == 'u10':
                     if x[i] < 0.0001: x[i] = 0.0001
                     if x[i] > .9999: x[i] = .9999
                     x[i] = ppf_func_u1(x[i])
@@ -251,7 +248,7 @@ class FullFitter(Talker, Writer):
                     x[i] = x[i]*span + self.mcmcbounds[0][i]
             return x
 
-        ndim = len(self.inputs.freeparamnames)
+        ndim = len(self.freeparamnames)
 
         self.speak('running dynesty')
         #self.dsampler = dynhelp.dyn(self.detrender, self.inputs, self.wavebin, self.mcmcbounds, ndim)
@@ -263,7 +260,7 @@ class FullFitter(Talker, Writer):
             self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, sample='slice')
             self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
 
-        quantiles = [_quantile(self.dsampler.results['samples'][:,i], [.16, .5, .84], weights=np.exp(self.dsampler.results['logwt'] - self.dsampler.results['logwt'][-1])) for i in range(len(self.inputs.freeparamnames))]
+        quantiles = [_quantile(self.dsampler.results['samples'][:,i], [.16, .5, .84], weights=np.exp(self.dsampler.results['logwt'] - self.dsampler.results['logwt'][-1])) for i in range(len(self.freeparamnames))]
         self.mcparams = np.array(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), quantiles))) # had to add list() for python3
 
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
@@ -276,64 +273,33 @@ class FullFitter(Talker, Writer):
 
         self.write('mcmc params:')
         self.write('     parameter        value                  plus                  minus')
-        [self.write('     '+self.inputs.freeparamnames[i]+'     '+str(self.mcparams[i][0])+'     '+str(self.mcparams[i][1])+'     '+str(self.mcparams[i][2])) for i in range(len(self.inputs.freeparamnames))]
-
-        for n, night in enumerate(self.inputs.nightname):
-            if 'dt'+str(n) in self.inputs.freeparamnames:
-                ind = int(np.where(np.array(self.inputs.freeparamnames) == 'dt'+str(n))[0])
-                self.inputs.t0[n] = self.mcparams[ind][0] + self.inputs.toff[n]
-                self.speak('mcfit reseting t0 parameter for {0}, transit midpoint = {1}'.format(night, self.inputs.t0[n]))
-            self.write('mcfit transit midpoint for {0}: {1}'.format(night, self.inputs.t0[n]))
+        [self.write('     '+self.freeparamnames[i]+'     '+str(self.mcparams[i][0])+'     '+str(self.mcparams[i][1])+'     '+str(self.mcparams[i][2])) for i in range(len(self.freeparamnames))]
 
         #calculate rms from mcfit
         modelobj = ModelMaker(self.inputs, self.wavebin, self.mcparams[:,0])
         models = modelobj.makemodel()
         resid = []
-        for n in range(len(self.inputs.nightname)):
-            resid.append((self.wavebin['lc'][n] - models[n])[self.wavebin['binnedok'][n]])
+        for subdir in self.wavebin['subdirectories']:
+            resid.append((self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']])
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('mcfit overall RMS: '+str(data_unc))
 
         # how many times the expected noise is the rms?
-        for n, night in enumerate(self.inputs.nightname):
-            self.write('x mean expected noise for {0}: {1}'.format(night, np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]])))
-        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin['photnoiseest'][n][self.wavebin['binnedok'][n]]) for n in range(len(self.inputs.nightname))])))
+        for n, subdir in enumerate(self.wavebin['subdirectories']):
+            self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
+        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) for n in range(len(self.wavebin['subdirectories']))])))
 
         self.wavebin['mcfit']['fitmodels'] = modelobj.fitmodel
         self.wavebin['mcfit']['batmanmodels'] = modelobj.batmanmodel
-        # update fitted limb darkening parameters
-        
+        self.wavebin['mcfit']['freeparamnames'] = self.freeparamnames
+        self.wavebin['mcfit']['freeparamvalues'] = self.freeparamvalues
+        self.wavebin['mcfit']['freeparambounds'] = self.freeparambounds
+        self.wavebin['mcfitdone'] = True
+        np.save(self.savewave, self.wavebin)
 
         plot = Plotter(self.inputs, self.subcube)
         plot.fullplots(self.wavebin)
 
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
-
-    def limbdarkparams(self, wavestart, waveend, teff=3270, teff_unc=104., 
-                            logg=5.06, logg_unc=0.20, z=-0.12, z_unc=0.15):
-        self.speak('using ldtk to derive limb darkening parameters')
-        filters = BoxcarFilter('a', wavestart, waveend),     # Define passbands - Boxcar filters for transmission spectroscopy
-        sc = LDPSetCreator(teff=(teff, teff_unc),             # Define your star, and the code
-                           logg=(logg, logg_unc),             # downloads the uncached stellar 
-                              z=(z   , z_unc),                # spectra from the Husser et al.
-                        filters=filters)                      # FTP server automatically.
-
-        ps = sc.create_profiles()                             # Create the limb darkening profiles
-        u , u_unc = ps.coeffs_qd(do_mc=True)                  # Estimate non-linear law coefficients
-        self.u0, self.u1 = u[0][0], u[0][1]
-        self.u0_unc, self.u1_unc = u_unc[0][0], u_unc[0][1]
-        self.write('limb darkening params: '+str(self.u0)+'  '+str(self.u1))
-
-        for n in range(len(self.inputs.nightname)):
-            if 'u0' in self.inputs.tranlabels[n]:
-                self.inputs.tranparams[n][-2], self.inputs.tranparams[n][-1] = self.u0, self.u1
-            if self.inputs.tranbounds[n][0][-2] == 'Joint': continue
-            else:
-                self.inputs.tranbounds[n][0][-2], self.inputs.tranbounds[n][1][-2] = self.u0-(5.*self.u0_unc), self.u0+(5.*self.u0_unc)
-                self.inputs.tranbounds[n][0][-1], self.inputs.tranbounds[n][1][-1] = self.u1-(5.*self.u1_unc), self.u1+(5.*self.u1_unc)
-                u0ind = np.where(np.array(self.inputs.freeparamnames) == 'u0'+str(n))[0][0]
-                self.inputs.freeparambounds[0][u0ind], self.inputs.freeparambounds[1][u0ind] = self.u0-(5.*self.u0_unc), self.u0+(5.*self.u0_unc)
-                self.inputs.freeparambounds[0][u0ind+1], self.inputs.freeparambounds[1][u0ind+1] = self.u1-(5.*self.u1_unc), self.u1+(5.*self.u1_unc)
-
 

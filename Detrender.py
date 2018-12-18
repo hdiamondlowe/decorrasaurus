@@ -48,13 +48,13 @@ class Detrender(Talker, Writer):
     
     def detrend(self):
         
-        self.speak('detrending data from nights {0} in directory {1}'.format(self.inputs.nightname, self.directoryname))
+        self.speak('detrending data from {0} in directory {1}'.format(self.subdirectories, self.directoryname))
 
-        for w, wavefile in enumerate(self.lcs.wavebin.wavefiles):
+        for w, wavefile in enumerate(self.lcs.allwavefiles):
             self.lmfit = LMFitter(self, wavefile)
 
-        if self.inputs.fullsample:
-            for wavefile in self.lcs.wavebin.wavefiles:
+        if self.inputs.inputs['fullsample']:
+            for wavefile in self.lcs.allwavefiles:
                 self.mcfit = FullFitter(self, wavefile)
 
 

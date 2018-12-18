@@ -12,27 +12,29 @@ class Inputs(Talker):
 
         Talker.__init__(self)
 
-        self.subdirectories = subdirectories
+        self.inputs = {}
+        self.inputs['subdirectories'] = subdirectories
 
-        for n, subdir in enumerate(self.subdirectories):
+
+        if not directoryname: self.createDirectory()
+        else: self.directoryname = directoryname[0]
+
+        for n, subdir in enumerate(self.inputs['subdirectories']):
             self.n = n
             self.subdir = subdir
-            if directoryname:
-                print('directoryname:', directoryname)
-                self.speak('going into directory {0}'.format(directoryname[0]))
-                self.directoryname = directoryname[0]
-                self.readInputs()
-            else: 
-                self.createDirectory()
-                self.readInputs()
-        self.speak('successfully read in and joined input parameters')
+            self.speak('going into directory {0}'.format(self.directoryname))
+            self.readInputs()
+
+        self.speak('successfully collected input parameters')
 
     def createDirectory(self):
         ''' Create a new directory to put detrender stuff in'''
 
-        self.speak('reading input file from {0}'.format(self.subdir))
+        subdir = self.inputs['subdirectories'][0]
 
-        file = open(self.subdir+'/input.init')
+        self.speak('creating directory from input file {0}'.format(subdir))
+
+        file = open(subdir+'/input.init')
         lines = file.readlines()
         dictionary = {}
         for i in range(3):
@@ -45,49 +47,37 @@ class Inputs(Talker):
             dictionary[key] = entries
 
 
-        if self.n == 0:
-            self.speak('creating new detrender directory')
-            self.speak('where possible, input values from {0} will be used'.format(self.subdir))
-            self.filename = dictionary['filename']
-            self.nightname = [dictionary['nightname']]
+        #if self.n == 0:
+        self.speak('creating new detrender directory')
+        self.speak('where possible, input values from {0} will be used'.format(subdir))
+        self.filename = dictionary['filename']
 
 
-            # create working folder for the files
-            dt = datetime.now()
-            runpath = dt.strftime('%Y-%m-%d-%H:%M_')+self.filename+'/'
-            directorypath = 'run' + '/'
-            if not os.path.exists(directorypath):
-                os.makedirs(directorypath)
-            if os.path.exists(directorypath+runpath):
-                self.speak('run path already exists! you are writing over some files...')
-            else:
-                os.makedirs(directorypath+runpath)
+        # create working folder for the files
+        dt = datetime.now()
+        runpath = dt.strftime('%Y-%m-%d-%H:%M_')+self.filename+'/'
+        directorypath = 'run' + '/'
+        if not os.path.exists(directorypath):
+            os.makedirs(directorypath)
+        if os.path.exists(directorypath+runpath):
+            self.speak('run path already exists! you are writing over some files...')
+        else:
+            os.makedirs(directorypath+runpath)
 
-            self.directoryname = directorypath+runpath
+        self.directoryname = directorypath+runpath
 
-        else: 
-            self.nightname.append(dictionary['nightname'])
-        
-
-        self.speak('copying {0} to directory {1}'.format(self.subdir+'/input.init', self.directoryname))
-        copyfile(self.subdir+'/input.init', self.directoryname+self.nightname[self.n]+'_input.init')
-        #copyfile(self.subdir+'/'+self.starlist[self.n], self.directoryname+self.nightname[self.n]+'_'+self.starlist[self.n])
+        for subdir in self.inputs['subdirectories']:
+            self.speak('copying {0} to directory {1}'.format(subdir+'/input.init', self.directoryname))
+            copyfile(subdir+'/input.init', self.directoryname+subdir+'_input.init')
             
-
     def readInputs(self):
 
-        inputfilenames = []
+        self.speak('reading {0} input file from {1}'.format(self.subdir, self.directoryname))
 
-        for file in os.listdir(self.directoryname):
-            if file.endswith('_input.init'):
-                inputfilenames.append(file)
-
-        # be careful here! if for some reason the sorted list of your directories does not match up with the sorted list of the observation nights, you will introduce an error
-        inputfilenames = sorted(inputfilenames)#, key=lambda x: datetime.strptime(x[:-3], '%Y_%m_%d'))
-
-        self.speak('reading {0} file from {1}'.format(inputfilenames[self.n], self.directoryname))
-
-        file = open(self.directoryname+inputfilenames[self.n])
+        try: file = open(self.directoryname+self.subdir+'_input.init')
+        except(FileNotFoundError): 
+            print('The input file you are looking for does not seem to exist. Inputs will not be collected.')
+            return
         lines = file.readlines()
         dictionary = {}
         for i in range(len(lines)):
@@ -110,161 +100,102 @@ class Inputs(Talker):
                     if s in dictionary.keys(): return float(dictionary[s])
                     else: return str(s)
 
-        if self.n == 0:
-            self.saveas = self.directoryname
-            if len(self.nightname) != self.n+1:
-                self.filename = dictionary['filename']
-                self.nightname = [dictionary['nightname']]
+        inputs = {}
+        inputs['n'] = str(self.n)
 
-        else:
-            if len(self.nightname) != self.n+1:
-                self.nightname.append(dictionary['nightname'])
-
-        print(self.filename, self.saveas, self.nightname)
-
-        # target and comparison list now designated in mosasaurus cube
+        inputs['nightname']  = dictionary['nightname']
+        inputs['against']    = dictionary['against']
+        inputs['fitlabels']  = dictionary['fitlabels']
+        inputs['polyfit']    = int(dictionary['polyfit'])
+        inputs['polylabels'] = [string.ascii_uppercase[x] for x in range(inputs['polyfit'])]
 
         if self.n == 0:
-            self.against = dictionary['against']
-            self.fitlabels = [dictionary['fitlabels']]
-            if type(self.fitlabels[self.n]) == str: self.fitlabels[self.n] = [self.fitlabels[self.n]]
-            self.polyfit = [int(dictionary['polyfit'])]
-            self.polylabels = [[string.ascii_uppercase[x] for x in range(self.polyfit[self.n])]]
 
-            self.Teff = float(dictionary['Teff'])
-            self.Teff_unc = float(dictionary['Teff_unc'])
-            self.logg = float(dictionary['logg'])
-            self.logg_unc = float(dictionary['logg_unc'])
-            self.z = float(dictionary['z'])
-            self.z_unc = float(dictionary['z_unc'])
-            self.ldlaw = str_to_bool(dictionary['ldlaw'])
+            self.inputs['directoryname'] = self.directoryname
 
-            self.T0 = float(dictionary['T0'])
-            self.P = float(dictionary['P'])
-            self.Tdur = float(dictionary['Tdur'])
-            self.inc = float(dictionary['inc'])
-            self.a = float(dictionary['a'])
-            self.ecc = float(dictionary['ecc'])
-            self.omega = float(dictionary['omega'])
-            self.epochnum = [int(dictionary['epochnum'])]
-            self.toff = [self.T0 + self.P*self.epochnum[self.n]]
+            self.inputs['Teff']     = float(dictionary['Teff'])
+            self.inputs['Teff_unc'] = float(dictionary['Teff_unc'])
+            self.inputs['logg']     = float(dictionary['logg'])
+            self.inputs['logg_unc'] = float(dictionary['logg_unc'])
+            self.inputs['z']        = float(dictionary['z'])
+            self.inputs['z_unc']    = float(dictionary['z_unc'])
+            self.inputs['ldlaw']    = str_to_bool(dictionary['ldlaw'])
 
-        else:
-            self.fitlabels.append(dictionary['fitlabels'])
-            # quick hack to make testing go faster - all fit labels are the same for all nights so only set them for self.n = 0
-            #self.speak( 'using hack to set all fitlabels to be the same as those from dataset0')
-            #self.fitlabels.append(self.fitlabels[0])
-            if type(self.fitlabels[self.n]) == str: self.fitlabels[self.n] = [self.fitlabels[self.n]]
-            self.polyfit.append(int(dictionary['polyfit']))
-            # quick hack to make testing go faster - all fit labels are the same for all nights so only set them for self.n = 0
-            #self.polyfit.append(self.polyfit[0])
-            self.polylabels.append([string.ascii_uppercase[x] for x in range(self.polyfit[self.n])])
-            self.epochnum.append(int(dictionary['epochnum']))
-            self.toff.append(self.T0 + self.P*self.epochnum[self.n])
+            self.inputs['T0']       = float(dictionary['T0'])
+            self.inputs['P']        = float(dictionary['P'])
+            self.inputs['Tdur']     = float(dictionary['Tdur'])
+            self.inputs['inc']      = float(dictionary['inc'])
+            self.inputs['a']        = float(dictionary['a'])
+            self.inputs['ecc']      = float(dictionary['ecc'])
+            self.inputs['omega']    = float(dictionary['omega'])
+ 
+        inputs['epochnum'] = int(dictionary['epochnum'])
+        inputs['toff'] = self.inputs['T0'] + self.inputs['P']*inputs['epochnum']
 
-        if self.n == 0:
-            self.tranlabels = [dictionary['tranlabels']]
-            self.tranparams = [[str_to_bool(i) for i in dictionary['tranparams']]]
-            self.tranbounds = [[[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]]
-            self.wavelength_lims = [[float(i) for i in dictionary['wavelength_lims']]]
-            assert(len(self.tranbounds[self.n][0]) == len(self.tranlabels[self.n]) and len(self.tranbounds[self.n][1]) == len(self.tranlabels[self.n])), 'There is something wrong with the transit parameter bounds'
+        inputs['tranlabels']      = dictionary['tranlabels']
+        inputs['tranparams']      = [str_to_bool(i) for i in dictionary['tranparams']]
+        inputs['tranbounds']      = [[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]
+        inputs['wavelength_lims'] = [float(i) for i in dictionary['wavelength_lims']]
+        assert(len(inputs['tranbounds'][0]) == len(inputs['tranlabels']) and len(inputs['tranbounds'][1]) == len(inputs['tranlabels'])), 'There is something wrong with the transit parameter bounds'
 
-            self.fitparams = [[1 for f in self.fitlabels[self.n]]]
-            self.polyparams = [[1 for p in self.polylabels[self.n]]]
+        inputs['fitparams']  = [1 for f in inputs['fitlabels']]
+        inputs['polyparams'] = [1 for p in inputs['polylabels']]
 
-            self.freeparambounds = [[], []]
-            self.freeparamnames = []
-            self.freeparamvalues = []
-            for p, plabel in enumerate(self.polylabels[self.n]):
-                self.freeparambounds[0].append(True)
-                self.freeparambounds[1].append(True)
-                self.freeparamnames.append(plabel+str(self.n))
-                self.freeparamvalues.append(self.polyparams[self.n][p])
-            for f, flabel in enumerate(self.fitlabels[self.n]):
-                self.freeparambounds[0].append(True)
-                self.freeparambounds[1].append(True)
-                self.freeparamnames.append(flabel+str(self.n))
-                self.freeparamvalues.append(self.fitparams[self.n][f])
-            for t, tlabel in enumerate(self.tranlabels[self.n]):
-                if type(self.tranbounds[self.n][0][t]) == bool and self.tranbounds[self.n][0][t] == False: continue
-                if self.tranbounds[self.n][0][t] == 'Joint': continue
-                self.freeparambounds[0].append(self.tranbounds[self.n][0][t])
-                self.freeparambounds[1].append(self.tranbounds[self.n][1][t])
-                self.freeparamnames.append(tlabel+str(self.n))
-                self.freeparamvalues.append(self.tranparams[self.n][t])
-            
+        inputs['freeparambounds'] = [[], []]
+        inputs['freeparamnames'] = []
+        inputs['freeparamvalues'] = []
 
-            dtind = int(np.where(np.array(self.tranlabels[self.n]) == 'dt')[0])
-            self.t0 = [self.toff[self.n] + self.tranparams[self.n][dtind]]
+        for p, plabel in enumerate(inputs['polylabels']):
+            inputs['freeparambounds'][0].append(True)
+            inputs['freeparambounds'][1].append(True)
+            inputs['freeparamnames'].append(plabel+str(self.n))
+            inputs['freeparamvalues'].append(inputs['polyparams'][p])
+        for f, flabel in enumerate(inputs['fitlabels']):
+            inputs['freeparambounds'][0].append(True)
+            inputs['freeparambounds'][1].append(True)
+            inputs['freeparamnames'].append(flabel+str(self.n))
+            inputs['freeparamvalues'].append(inputs['fitparams'][f])
+        for t, tlabel in enumerate(inputs['tranlabels']):
+            if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue
+            inputs['freeparambounds'][0].append(inputs['tranbounds'][0][t])
+            inputs['freeparambounds'][1].append(inputs['tranbounds'][1][t])
+            inputs['freeparamnames'].append(tlabel+str(self.n))
+            inputs['freeparamvalues'].append(inputs['tranparams'][t])
 
-        else:
-            self.tranlabels.append(dictionary['tranlabels'])
-            self.tranparams.append([str_to_bool(i) for i in dictionary['tranparams']])
-            self.tranbounds.append([[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]])
-            if dictionary['wavelength_lims'] == 'Joint':
-                self.wavelength_lims.append(self.wavelength_lims[0])
-            else: self.wavelength_lims.append([float(i) for i in dictionary['wavelength_lims']])
-
-            self.fitparams.append([1 for f in self.fitlabels[self.n]])
-            self.polyparams.append([1 for p in self.polylabels[self.n]])
-
-            for p, plabel in enumerate(self.polylabels[self.n]):
-                self.freeparambounds[0].append(True)
-                self.freeparambounds[1].append(True)
-                self.freeparamnames.append(plabel+str(self.n))
-                self.freeparamvalues.append(self.polyparams[self.n][p])
-            for f, flabel in enumerate(self.fitlabels[self.n]):
-                self.freeparambounds[0].append(True)
-                self.freeparambounds[1].append(True)
-                self.freeparamnames.append(flabel+str(self.n))
-                self.freeparamvalues.append(self.fitparams[self.n][f])
-            for t, tlabel in enumerate(self.tranlabels[self.n]):
-                if type(self.tranbounds[self.n][0][t]) == bool and self.tranbounds[self.n][0][t] == False: continue
-                if self.tranbounds[self.n][0][t] == 'Joint': continue
-                self.freeparambounds[0].append(self.tranbounds[self.n][0][t])
-                self.freeparambounds[1].append(self.tranbounds[self.n][1][t])
-                self.freeparamnames.append(tlabel+str(self.n))
-                self.freeparamvalues.append(self.tranparams[self.n][t])
-
-            dtind = int(np.where(np.array(self.tranlabels[self.n]) == 'dt')[0])
-            self.t0.append(self.toff[self.n] + self.tranparams[self.n][dtind])
+        dtind = int(np.where(np.array(inputs['tranlabels']) == 'dt')[0])
+        inputs['t0'] = inputs['toff'] + inputs['tranparams'][dtind]
 
         if self.n == 0:
-            self.binlen = str_to_bool(dictionary['binlen'])
-            self.sigclip = float(dictionary['sigclip'])
-            self.timesTdur = float(dictionary['timesTdur'])
-            try: self.midclip_inds = [str_to_bool(dictionary['midclip_inds'])]
-            except(TypeError): self.midclip_inds = [[int(i) for i in dictionary['midclip_inds']]]
+            self.inputs['jointparams'] = dictionary['jointparams']
+            self.inputs['binlen']      = str_to_bool(dictionary['binlen'])
+            self.inputs['sigclip']     = float(dictionary['sigclip'])
+            self.inputs['timesTdur']   = float(dictionary['timesTdur'])
 
-            self.samplecode = dictionary['samplecode']
-            
-            if self.samplecode == 'dynesty': pass
+
+        try: inputs['midclip_inds'] = str_to_bool(dictionary['midclip_inds'])
+        except(TypeError): inputs['midclip_inds'] = [int(i) for i in dictionary['midclip_inds']]
+
+        if self.n == 0:
+            self.inputs['samplecode'] = dictionary['samplecode']            
+            if self.inputs['samplecode'] == 'dynesty': pass
                 
-            elif self.samplecode == 'emcee':
-                self.nwalkers = int(dictionary['nwalkers'])
-                self.nsteps = int(dictionary['nsteps'])
-                self.burnin = int(dictionary['burnin'])
+            elif self.inputs['samplecode'] == 'emcee':
+                self.inputs['nwalkers'] = int(dictionary['nwalkers'])
+                self.inputs['nsteps']   = int(dictionary['nsteps'])
+                self.inputs['burnin']   = int(dictionary['burnin'])
 
-            self.optext = str_to_bool(dictionary['optext'])
-            self.istarget = str_to_bool(dictionary['istarget'])
-            self.isasymm = str_to_bool(dictionary['isasymm'])
-            self.invvar = str_to_bool(dictionary['invvar'])
-            self.dividewhite = str_to_bool(dictionary['dividewhite'])
-            self.ldmodel = str_to_bool(dictionary['ldmodel'])
-            self.fullsample = str_to_bool(dictionary['fullsample'])
-            self.makeplots = str_to_bool(dictionary['makeplots'])
+            self.inputs['optext']      = str_to_bool(dictionary['optext'])
+            self.inputs['istarget']    = str_to_bool(dictionary['istarget'])
+            self.inputs['isasymm']     = str_to_bool(dictionary['isasymm'])
+            self.inputs['invvar']      = str_to_bool(dictionary['invvar'])
+            self.inputs['dividewhite'] = str_to_bool(dictionary['dividewhite'])
+            self.inputs['ldmodel']     = str_to_bool(dictionary['ldmodel'])
+            self.inputs['fullsample']  = str_to_bool(dictionary['fullsample'])
+            self.inputs['makeplots']   = str_to_bool(dictionary['makeplots'])
 
-            self.datacubepath = [dictionary['datacubepath']]
-            self.specstretchpath = [dictionary['specstretchpath']]
+        inputs['datacubepath']    = dictionary['datacubepath']
+        inputs['specstretchpath'] = dictionary['specstretchpath']
         
-        else:
-
-            try: self.midclip_inds.append(str_to_bool(dictionary['midclip_inds']))
-            except(TypeError): self.midclip_inds.append([int(i) for i in dictionary['midclip_inds']])
-
-            self.datacubepath.append(dictionary['datacubepath'])
-            self.specstretchpath.append(dictionary['specstretchpath'])
-
-
+        self.inputs[self.subdir] = inputs
                     
 
