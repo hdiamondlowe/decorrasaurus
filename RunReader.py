@@ -19,8 +19,6 @@ class RunReader(Talker, Writer):
         # decide whether or not this Reducer is chatty
         Talker.__init__(self)
 
-        print(type(rundirectory[0]))
-
         if rundirectory: 
             
             self.rundirectory = str(rundirectory[0])
