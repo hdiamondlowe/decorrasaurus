@@ -70,8 +70,10 @@ class Plotter(Talker):
         for subdir in self.wavebin['subdirectories']:
             for f in self.inputs[subdir]['fitlabels']:
                 plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['compcube'][f][self.wavebin[subdir]['binnedok']], alpha=0.7, label=f+str(self.inputs[subdir]['n']))
+            polymodel = 0
             for p in range(self.inputs[subdir]['polyfit']):
-                plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], ((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])**p, label='polyfit '+str(p))
+                polymodel += ((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])**p           
+            if self.inputs[subdir]['polyfit'] > 0: plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], polymodel, label='polyfit deg'+str(self.inputs[subdir]['polyfit']))
             plt.legend(loc='best')
             plt.xlabel('BJD')
             plt.ylabel('Parameter')
@@ -289,19 +291,19 @@ class Plotter(Talker):
         models = modelobj.makemodel()
         self.speak('plotting fullfit detrended lightcurve with batman model vs time')
         plt.figure()
-        for n, subdir in enumerate(self.subdirectories):
+        for n, subdir in enumerate(self.wavebin['subdirectories']):
             plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/modelobj.fitmodel[subdir])[self.wavebin[subdir]['binnedok']], 'o', markeredgecolor='none', alpha=0.5)
-        for n, subdir in enumerate(self.subdirectories):
+        for n, subdir in enumerate(self.wavebin['subdirectories']):
             plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (modelobj.batmanmodel[subdir])[self.wavebin[subdir]['binnedok']], 'k-', lw=2)
         plt.xlabel('Time from Mid-Transit (days)', fontsize=20)
         plt.ylabel('Normalized Flux', fontsize=20)
         plt.title('Full Fit for '+self.wavefile+' angstroms', fontsize=20)
         plt.tight_layout()
-        plt.savefig(self.inputs.saveas+self.wavefile+'_figure_fullfitdetrendedlc.png')
+        plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitdetrendedlc.png')
         plt.clf()
         plt.close()
 
-        if self.inputs.samplecode == 'emcee':        
+        if self.inputs['samplecode'] == 'emcee':        
 
             self.speak('plotting walkers vs steps')
             fig, axes = plt.subplots(len(self.inputs.freeparamnames), 1, sharex=True, figsize=(16, 12))
@@ -334,7 +336,7 @@ class Plotter(Talker):
             plt.clf()
             plt.close()
 
-        elif self.inputs.samplecode == 'dynesty':
+        elif self.inputs['samplecode'] == 'dynesty':
 
             truths = self.wavebin['lmfit']['values'][:]
             truths.append(self.wavebin['ldparams']['v0'])
@@ -344,7 +346,7 @@ class Plotter(Talker):
             # trace plot
             self.speak('plotting dynesty trace plots')
             fig, axes = dyplot.traceplot(self.wavebin['mcfit']['results'], labels=self.wavebin['mcfit']['freeparamnames'], post_color='royalblue', truths=truths, truth_color='firebrick', truth_kwargs={'alpha': 0.8}, fig=plt.subplots(len(self.wavebin['mcfit']['freeparamnames']), 2, figsize=(12, 30)), trace_kwargs={'edgecolor':'none'})
-            plt.savefig(self.inputs.saveas+self.wavefile+'_figure_dynestychains.png')
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_dynestychains.png')
             plt.clf()
             plt.close()
 

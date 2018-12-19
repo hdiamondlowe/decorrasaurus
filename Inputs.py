@@ -106,6 +106,7 @@ class Inputs(Talker):
         inputs['nightname']  = dictionary['nightname']
         inputs['against']    = dictionary['against']
         inputs['fitlabels']  = dictionary['fitlabels']
+        if type(inputs['fitlabels']) == str: inputs['fitlabels'] = [dictionary['fitlabels']]
         inputs['polyfit']    = int(dictionary['polyfit'])
         inputs['polylabels'] = [string.ascii_uppercase[x] for x in range(inputs['polyfit'])]
 

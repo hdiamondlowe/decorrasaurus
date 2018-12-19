@@ -204,14 +204,17 @@ class LMFitter(Talker, Writer):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
 
         # make BIC calculations
-        # var = np.power(data_unc, 2.)
-        var = 4.5e-7    # variance must remain fixed across all trials in order to make a comparison of BIC values
+        #var = 1    # variance must remain fixed across all trials in order to make a comparison of BIC values
         for subdir in self.wavebin['subdirectories']:
-            lnlike = -0.5*np.sum(((self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']])**2/var + np.log(2.*np.pi*var))
-            plbls = len(np.where([k.endswith((str(0))) for k in self.linfit3.params.keys()])[0])
-            lnn = np.log(len(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]))
-            BIC = -2.*lnlike + plbls*lnn
-            self.write('{0} BIC: {1}'.format(subdir, BIC))
+            #var = self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]
+            #lnlike = -0.5*np.sum(((self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']])**2/var + np.log(2.*np.pi*var))
+            #plbls = len(self.inputs[subdir]['fitlabels']) + self.inputs[subdir]['polyfit']
+            #lnn = np.log(len(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]))
+            #BIC = -2.*lnlike + plbls*lnn
+            #self.write('lnlike = {0}, second term = {1}'.format(lnlike*(-2.), plbls*lnn))
+            #self.write('Model statistics for {0}: my BIC: {1}'.format(subdir, BIC))
+            self.write('Model statistics for {0}: BIC = {1}, AIC = {2}'.format(subdir, self.linfit2.bic, self.linfit2.aic)) # use linfit2 when uncertainty was taken from photon noise estimate (does not vary with fit)
+            #self.write('Model statistics for {0}: BIC = {1}, AIC = {2}'.format(subdir, self.linfit3.bic, self.linfit3.aic))
 
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['lmfit'] = {}

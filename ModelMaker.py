@@ -24,8 +24,10 @@ class ModelMaker(Talker):
                 poly.append(self.params[paramind])
             N = len(poly)
             polymodel = 0
+            time_range = self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']][-1] - self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']][0]
+            time_array = (self.wavebin[subdir]['compcube']['bjd']-self.inputs[subdir]['toff'])/time_range
             while N > 0:
-                polymodel += poly[N-1]*(self.wavebin[subdir]['compcube']['bjd']-self.inputs[subdir]['toff'])**(N-1)
+                polymodel += poly[N-1]*(time_array)**(N-1)
                 N -= 1
             x = []
             for flabel in self.inputs[subdir]['fitlabels']:
@@ -33,7 +35,6 @@ class ModelMaker(Talker):
                 x.append(self.params[paramind]*self.wavebin[subdir]['compcube'][flabel])
             parammodel = np.sum(x, 0)
             self.fitmodel[subdir] = (polymodel + parammodel + 1)
-
 
         tranvalues = {}
         for subdir in self.wavebin['subdirectories']:
