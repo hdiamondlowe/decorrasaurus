@@ -25,13 +25,10 @@ class WaveBinner(Talker):
                 self.makeBinIndices()
                 self.speak('saving wavebin properties to the subcube')
                 np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
-            elif 'wavebin' in self.subcube[self.subdir].keys():
-                self.speak('reading in wavebin parameters from subcube saved in {0}'.format(self.detrender.directoryname))
-                self.binindices[self.subdir] = self.subcube[self.subdir]['wavebin']['binindices']
-                self.wavelims[self.subdir] = self.subcube[self.subdir]['wavebin']['wavelims']
-                self.wavefiles[self.subdir] = self.subcube[self.subdir]['wavebin']['wavefiles']
             else: 
                 self.makeBinIndices()
+                self.speak('saving wavefiles to subcube')
+                np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
 
 
     def makeBinIndices(self):
@@ -79,9 +76,6 @@ class WaveBinner(Talker):
             
         self.binindices[self.subdir] = binindices
         self.wavefiles[self.subdir] = [str(i[0])+'-'+str(i[1]) for i in self.wavelims[self.subdir]]
-        #self.subcube[self.subdir]['wavebin'] = {}
-        #self.subcube[self.subdir]['wavebin']['binindices'] = binindices
-        #self.subcube[self.subdir]['wavebin']['wavelims'] = self.wavelims[self.subdir]
-        #self.subcube[self.subdir]['wavebin']['wavefiles'] = self.wavefiles[self.subdir]
+        self.subcube[self.subdir]['wavefiles'] = self.wavefiles[self.subdir]
       
 

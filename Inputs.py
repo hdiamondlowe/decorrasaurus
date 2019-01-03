@@ -168,6 +168,7 @@ class Inputs(Talker):
 
         if self.n == 0:
             self.inputs['jointparams'] = dictionary['jointparams']
+            if type(self.inputs['jointparams']) == str: self.inputs['jointparams'] = [dictionary['jointparams']]
             self.inputs['binlen']      = str_to_bool(dictionary['binlen'])
             self.inputs['sigclip']     = float(dictionary['sigclip'])
             self.inputs['timesTdur']   = float(dictionary['timesTdur'])
