@@ -9,26 +9,25 @@ class CubeReader(Talker):
         Talker.__init__(self)
         
         self.detrender = detrender
-        self.inputs = self.detrender.inputs
+        self.inputs = self.detrender.inputs.inputs
         self.subdirectories = subdirectories
 
         try: 
             self.speak('trying to read in subcube')
-            self.subcube = np.load(self.inputs.saveas+'subcube.npy')[()]
+            self.subcube = np.load(self.inputs['directoryname']+'subcube.npy')[()]
             self.speak('loaded in subcube') 
         except(IOError):
             self.speak('subcube does not exist, creating a new one')
-            self.subcube = [] # make a list of subcubes for all nights involved
-            for n, subdir in enumerate(self.subdirectories):
-                self.n = n
+            self.subcube = {} # make a dictionary of subcubes for all nights involved
+            for subdir in self.subdirectories:
                 self.subdir = subdir
-                self.datacubepath = self.inputs.datacubepath[self.n]
-                self.specstretchpath = self.inputs.specstretchpath[self.n]
+                self.datacubepath = self.inputs[subdir]['datacubepath']
+                self.specstretchpath = self.inputs[subdir]['specstretchpath']
                 self.makeSubCube()
-            np.save(self.inputs.saveas+'subcube.npy', self.subcube)
+            np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
             self.speak('subcube saved')
 
-            if self.inputs.makeplots:
+            if self.inputs['makeplots']:
                 plot = Plotter(self.inputs, self.subcube)
                 plot.cubeplots()
 
@@ -70,47 +69,42 @@ class CubeReader(Talker):
         subcube['dwidth'] = deepcopy(cube['cubes']['width'])           # [star](time, wave)
         subcube['peak'] = deepcopy(cube['cubes']['peak'])              # [star](time, wave)
 
-        self.subcube.append(subcube)
+        self.subcube[self.subdir] = subcube
 
-    def makeCompCube(self, subbinindices, n):
+    def makeCompCube(self, subbinindices, subdir):
         '''A minicube is a subset of a subcube that only includes the relevant wavelength information for a given wavelength bin'''
 
-        self.speak('making compcube for subdirectory number {0}'.format(n))
+        self.speak('making compcube for subdirectory {0}'.format(subdir))
         #subbinindices are of the format [numexps, numwave]
         self.subbinindices = subbinindices
-        self.n = n
-        target = self.subcube[self.n]['target']
-        comparisons = self.subcube[self.n]['comparisons']
-
-        #if binnedok: self.binnedok = binnedok[0]
-        #else: self.binnedok = np.array([b for b in self.subcube[self.n]['mosasaurusok']])
-
+        target = self.subcube[subdir]['target']
+        comparisons = self.subcube[subdir]['comparisons']
 
         self.compcube = {}
         #self.compcube['binnedok'] = self.binnedok
-        self.compcube['bjd'] = self.subcube[self.n]['bjd']
-        self.compcube['norm'] = self.subcube[self.n]['norm']
+        self.compcube['bjd'] = self.subcube[subdir]['bjd']
+        self.compcube['norm'] = self.subcube[subdir]['norm']
 
-        for key in self.inputs.fitlabels[self.n]:
+        for key in self.inputs[subdir]['fitlabels']:
 
             if key in ['airmass', 'rotangle']:
-                self.compcube[key] = (self.subcube[self.n][key] - np.mean(self.subcube[self.n][key]))/(np.std(self.subcube[self.n][key]))
+                self.compcube[key] = (self.subcube[subdir][key] - np.mean(self.subcube[subdir][key]))/(np.std(self.subcube[subdir][key]))
 
-            if self.inputs.invvar: 
+            if self.inputs['invvar']: 
                 self.speak('weighting by inverse variance')
-                raw_counts_comps = np.array([np.sum(self.subcube[self.n]['raw_counts'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs.comparison[self.n]))])
-                sky_counts_comps = np.array([np.sum(self.subcube[self.n]['sky'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs.comparison[self.n]))])
+                raw_counts_comps = np.array([np.sum(self.subcube[subdir]['raw_counts'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs[subdir]['comparison']))])
+                sky_counts_comps = np.array([np.sum(self.subcube[subdir]['sky'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs[subdir]['comparison']))])
                 sig2 = raw_counts_comps + sky_counts_comps
                 den = np.sum((1./sig2), 0)
 
             if key in ['centroid', 'width', 'median_width']:#, 'stretch', 'shift']:
                 # detrend against target or comparisons, as specified in inputs
-                if self.inputs.against == 'target': keyarray = np.array([self.subcube[self.n][key][target]])
-                elif self.inputs.against == 'comparisons': keyarray = np.array([self.subcube[self.n][key][comparisons[i]] for i in range(len(comparisons))])
-                elif self.inputs.against == 'difference': keyarray = np.array([self.subcube[self.n][key][target]]) - np.array([self.subcube[self.n][key][comparisons[i]] for i in range(len(comparisons))])
+                if self.inputs[subdir]['against'] == 'target': keyarray = np.array([self.subcube[subdir][key][target]])
+                elif self.inputs[subdir]['against'] == 'comparisons': keyarray = np.array([self.subcube[subdir][key][comparisons[i]] for i in range(len(comparisons))])
+                elif self.inputs[subdir]['against'] == 'difference': keyarray = np.array([self.subcube[subdir][key][target]]) - np.array([self.subcube[subdir][key][comparisons[i]] for i in range(len(comparisons))])
                 else: self.speak('you have not specified what to detrend against; must be target or comparisons')
 
-                if self.inputs.invvar:
+                if self.inputs['invvar']:
                     num = np.sum((keyarray/sig2), 0)
                     self.compcube[key] = num/den
                 else:
@@ -119,12 +113,12 @@ class CubeReader(Talker):
 
             if key in ['stretch', 'shift']:
                 # detrend against target or comparisons, as specified in inputs
-                if self.inputs.against == 'target': keyarray = np.array([list(self.subcube[self.n][key][target].values())])
-                elif self.inputs.against == 'comparisons': keyarray = np.array([list(self.subcube[self.n][key][comparisons[i]].values()) for i in range(len(comparisons))])
-                elif self.inputs.against == 'difference': keyarray = np.array([list(self.subcube[self.n][key][target].values())]) - np.array([list(self.subcube[self.n][key][comparisons[i]].values()) for i in range(len(comparisons))])
+                if self.inputs[subdir]['against'] == 'target': keyarray = np.array([list(self.subcube[subdir][key][target].values())])
+                elif self.inputs[subdir]['against'] == 'comparisons': keyarray = np.array([list(self.subcube[subdir][key][comparisons[i]].values()) for i in range(len(comparisons))])
+                elif self.inputs[subdir]['against'] == 'difference': keyarray = np.array([list(self.subcube[subdir][key][target].values())]) - np.array([list(self.subcube[subdir][key][comparisons[i]].values()) for i in range(len(comparisons))])
                 else: self.speak('you have not specified what to detrend against; must be target or comparisons')
 
-                if self.inputs.invvar:
+                if self.inputs['invvar']:
                     num = np.sum((keyarray/sig2), 0)
                     self.compcube[key] = num/den
                 else:
@@ -133,11 +127,11 @@ class CubeReader(Talker):
 
             if key in ['raw_counts', 'sky', 'dcentroid', 'dwidth', 'peak']:
                 # detrend against target or comparisons, as specified in inputs
-                if self.inputs.against == 'target': keyarray = np.array([np.nansum(self.subcube[self.n][key][target] * self.subbinindices, 1)])
-                elif self.inputs.against == 'comparisons': keyarray = np.array([np.nansum(self.subcube[self.n][key][comparisons[i]] * self.subbinindices, 1) for i in range(len(comparisons))])
-                elif self.inputs.against == 'difference': keyarray = np.array([np.nansum(self.subcube[self.n][key][target] * self.subbinindices, 1)]) - np.array([np.nansum(self.subcube[self.n][key][comparisons[i]] * self.subbinindices, 1) for i in range(len(comparisons))])
+                if self.inputs[subdir]['against'] == 'target': keyarray = np.array([np.nansum(self.subcube[subdir][key][target] * self.subbinindices, 1)])
+                elif self.inputs[subdir]['against'] == 'comparisons': keyarray = np.array([np.nansum(self.subcube[subdir][key][comparisons[i]] * self.subbinindices, 1) for i in range(len(comparisons))])
+                elif self.inputs[subdir]['against'] == 'difference': keyarray = np.array([np.nansum(self.subcube[subdir][key][target] * self.subbinindices, 1)]) - np.array([np.nansum(self.subcube[subdir][key][comparisons[i]] * self.subbinindices, 1) for i in range(len(comparisons))])
                 else: self.speak('you have not specified what to detrend against; must be target or comparisons')
-                if self.inputs.invvar:
+                if self.inputs['invvar']:
                     num = np.sum((keyarray/sig2), 0)
                     self.compcube[key] = num/den
                 else: 
