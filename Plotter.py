@@ -280,9 +280,9 @@ class Plotter(Talker):
         t0 = []
         for subdir in self.wavebin['subdirectories']:
             n = str(self.inputs[subdir]['n'])
-            if 'dt'+n in self.wavebin['mcfit']['freeparamnames']:
-                dtind = np.argwhere(np.array(self.wavebin['mcfit']['freeparamnames']) == 'dt'+n)[0][0]
-                t0.append(self.inputs[subdir]['toff'] + self.wavebin['mcfit']['values'][dtind])
+            if 'dt'+n in self.wavebin['lmfit']['freeparamnames']:
+                dtind = np.argwhere(np.array(self.wavebin['lmfit']['freeparamnames']) == 'dt'+n)[0][0]
+                t0.append(self.inputs[subdir]['toff'] + self.wavebin['lmfit']['values'][dtind])
             else:
                 dtind = np.argwhere(np.array(self.inputs[subdir]['tranlabels']) == 'dt')[0][0]
                 t0.append(self.inputs[subdir]['toff'] + self.inputs[subdir]['tranparams'][dtind])
@@ -294,7 +294,7 @@ class Plotter(Talker):
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/modelobj.fitmodel[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C'+self.inputs[subdir]['n'], markeredgecolor='none', alpha=0.5)
         for n, subdir in enumerate(self.wavebin['subdirectories']):
-            plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (modelobj.batmanmodel[subdir])[self.wavebin[subdir]['binnedok']], 'k-', lw=2)
+            plt.plot(self.subcube[subdir]['bjd']-t0[n], modelobj.batmanmodel[subdir], 'k-', lw=2)
         plt.xlabel('Time from Mid-Transit (days)', fontsize=20)
         plt.ylabel('Normalized Flux', fontsize=20)
         plt.title('Full Fit for '+self.wavefile+' angstroms', fontsize=20)
@@ -303,7 +303,7 @@ class Plotter(Talker):
         plt.clf()
         plt.close()
 
-        '''
+        
         if self.inputs['samplecode'] == 'emcee':        
 
             self.speak('plotting walkers vs steps')
@@ -357,5 +357,5 @@ class Plotter(Talker):
             plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_mcmccorner.png')
             plt.clf()
             plt.close()
-            '''
+            
 
