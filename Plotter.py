@@ -350,8 +350,8 @@ class Plotter(Talker):
 
             
             # corner plot
-            fig, axes = dyplot.cornerplot(self.wavebin['mcfit']['results'], labels=self.inputs.freeparamnames, truths=truths, show_titles=True, title_kwargs={'y': 1.04}, fig=plt.subplots(len(self.inputs.freeparamnames), len(self.inputs.freeparamnames), figsize=(15, 15)))
-            plt.savefig(self.inputs.saveas+'_'+self.wavefile+'_figure_mcmccorner.png')
+            fig, axes = dyplot.cornerplot(self.wavebin['mcfit']['results'], labels=self.wavebin['mcfit']['freeparamnames'], truths=truths, show_titles=True, title_kwargs={'y': 1.04}, fig=plt.subplots(len(self.wavebin['mcfit']['freeparamnames']), len(self.wavebin['mcfit']['freeparamnames']), figsize=(20, 20)))
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_mcmccorner.png')
             plt.clf()
             plt.close()
             

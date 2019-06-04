@@ -2,6 +2,7 @@
 
 from imports import *
 from BatmanLC import BatmanLC
+from RobinLC import RobinLC
 
 class ModelMaker(Talker):
 
@@ -68,18 +69,28 @@ class ModelMaker(Talker):
                     else: tranvalues[subdir][tranlabel] = self.inputs[subdir]['tranparams'][t]   
                     #values[tranlabel] = self.inputs.tranparams[n][t]   
 
-        #print [tranvalues[n]['dt'] for n in range(len(self.inputs.nightname))]
+        #print(tranvalues)
 
         # make the transit model with batman; or some alternative
         if self.inputs['istarget'] and not self.inputs['isasymm']:
             self.batmanmodel = {}
             for n, subdir in enumerate(self.wavebin['subdirectories']):
-                batman = BatmanLC(times=self.wavebin[subdir]['compcube']['bjd'], t0=(self.inputs[subdir]['toff']+tranvalues[subdir]['dt']), 
-                                  rp=tranvalues[subdir]['rp'], per=tranvalues[subdir]['per'], inc=tranvalues[subdir]['inc'], a=tranvalues[subdir]['a'], ecc=tranvalues[subdir]['ecc'], omega=tranvalues[subdir]['omega'], 
-                                  u0=tranvalues[subdir]['u0'], u1=tranvalues[subdir]['u1'], ldlaw=self.inputs['ldlaw'])#, batmanfac=self.inputs.batmanfac)
-                batmanmodel = batman.batman_model()
-                if n == 0 and np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
-                self.batmanmodel[subdir] = batmanmodel
+                if self.inputs['modelcode'] == 'batman':
+                    batman = BatmanLC(times=self.wavebin[subdir]['compcube']['bjd'], t0=(self.inputs[subdir]['toff']+tranvalues[subdir]['dt']), 
+                                      rp=tranvalues[subdir]['rp'], per=tranvalues[subdir]['per'], inc=tranvalues[subdir]['inc'], a=tranvalues[subdir]['a'], ecc=tranvalues[subdir]['ecc'], omega=tranvalues[subdir]['omega'], 
+                                      u0=tranvalues[subdir]['u0'], u1=tranvalues[subdir]['u1'], ldlaw=self.inputs['ldlaw'])#, batmanfac=self.inputs.batmanfac)
+                    batmanmodel = batman.batman_model()
+                    if n == 0 and np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
+                    self.batmanmodel[subdir] = batmanmodel
+                elif self.inputs['modelcode'] == 'robin':
+                    robin = RobinLC(times=self.wavebin[subdir]['compcube']['bjd'], t0=(self.inputs[subdir]['toff']+tranvalues[subdir]['dt']), 
+                                      p0=tranvalues[subdir]['p0'], p1=tranvalues[subdir]['p1'], 
+                                      per=tranvalues[subdir]['per'], inc=tranvalues[subdir]['inc'], a=tranvalues[subdir]['a'], ecc=tranvalues[subdir]['ecc'], omega=tranvalues[subdir]['omega'], 
+                                      u0=tranvalues[subdir]['u0'], u1=tranvalues[subdir]['u1'], ldlaw=self.inputs['ldlaw'])#, batmanfac=self.inputs.batmanfac)
+                    robinmodel = robin.robin_model()
+                    if n == 0 and np.all(robinmodel == 1.): self.speak('robin model returned all 1s')
+                    self.batmanmodel[subdir] = robinmodel
+
         elif self.inputs['istarget'] and self.inputs['isasymm']:
             rp, tau0, tau1, tau2 = [], [], [], []
             numtau = 0

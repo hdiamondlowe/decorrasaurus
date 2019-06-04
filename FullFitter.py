@@ -199,8 +199,10 @@ class FullFitter(Talker, Writer):
         self.mcmcbounds[1] = [i for i in self.freeparambounds[1]]
 
         for i, name in enumerate(self.wavebin['lmfit']['freeparamnames']):
-            self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*10.
-            self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*10.
+            if self.mcmcbounds[0][i] == True:
+                self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*10.
+            if self.mcmcbounds[1][i] == True: 
+                self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*10.
 
         self.write('lower and upper bounds for mcmc walkers:')
         for b, name in enumerate(self.freeparamnames):

@@ -114,21 +114,23 @@ class Inputs(Talker):
 
             self.inputs['directoryname'] = self.directoryname
 
-            self.inputs['Teff']     = float(dictionary['Teff'])
-            self.inputs['Teff_unc'] = float(dictionary['Teff_unc'])
-            self.inputs['logg']     = float(dictionary['logg'])
-            self.inputs['logg_unc'] = float(dictionary['logg_unc'])
-            self.inputs['z']        = float(dictionary['z'])
-            self.inputs['z_unc']    = float(dictionary['z_unc'])
-            self.inputs['ldlaw']    = str_to_bool(dictionary['ldlaw'])
+            self.inputs['Teff']      = float(dictionary['Teff'])
+            self.inputs['Teff_unc']  = float(dictionary['Teff_unc'])
+            self.inputs['logg']      = float(dictionary['logg'])
+            self.inputs['logg_unc']  = float(dictionary['logg_unc'])
+            self.inputs['z']         = float(dictionary['z'])
+            self.inputs['z_unc']     = float(dictionary['z_unc'])
+            self.inputs['ldlaw']     = str_to_bool(dictionary['ldlaw'])
 
-            self.inputs['T0']       = float(dictionary['T0'])
-            self.inputs['P']        = float(dictionary['P'])
-            self.inputs['Tdur']     = float(dictionary['Tdur'])
-            self.inputs['inc']      = float(dictionary['inc'])
-            self.inputs['a']        = float(dictionary['a'])
-            self.inputs['ecc']      = float(dictionary['ecc'])
-            self.inputs['omega']    = float(dictionary['omega'])
+            self.inputs['T0']        = float(dictionary['T0'])
+            self.inputs['P']         = float(dictionary['P'])
+            self.inputs['Tdur']      = float(dictionary['Tdur'])
+            self.inputs['inc']       = float(dictionary['inc'])
+            self.inputs['a']         = float(dictionary['a'])
+            self.inputs['ecc']       = float(dictionary['ecc'])
+            self.inputs['omega']     = float(dictionary['omega'])
+
+            self.inputs['modelcode'] = dictionary['modelcode']
  
         inputs['epochnum'] = int(dictionary['epochnum'])
         inputs['toff'] = self.inputs['T0'] + self.inputs['P']*inputs['epochnum']
