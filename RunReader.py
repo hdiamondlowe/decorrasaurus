@@ -89,7 +89,7 @@ class RunReader(Talker, Writer):
 
             for i, fitparam in enumerate(wavebin[fit]['freeparamnames']):
                 self.results['allparamnames'].append(fitparam)
-                if fitparam[:-1] in self.inputs['jointparams']: fitparam = 'rp0'
+                if fitparam[:-1] in self.inputs['jointparams']: fitparam = fitparam[:-1]+str(0)
                 self.results.setdefault(fitparam, []).append(wavebin[fit]['values'][i])
                 self.results.setdefault(fitparam+'_unc', []).append(wavebin[fit]['uncs'][i])
 
