@@ -44,10 +44,11 @@ class LMFitter(Talker, Writer):
         if len(self.wavebin['subdirectories']) > 1:
             removeinds = []
             for jointparam in self.inputs['jointparams']:
-                for subdir in self.wavebin['subdirectories'][1:]:
-                    paramind = np.argwhere(np.array(self.freeparamnames) == jointparam+self.inputs[subdir]['n'])
-                    paramind = np.ndarray.flatten(paramind)[0]
-                    removeinds.append(paramind)
+                if jointparam+str(0) in self.freeparamnames:
+                    for subdir in self.wavebin['subdirectories'][1:]:
+                        paramind = np.argwhere(np.array(self.freeparamnames) == jointparam+self.inputs[subdir]['n'])
+                        paramind = np.ndarray.flatten(paramind)[0]
+                        removeinds.append(paramind)
             self.freeparamnames  = np.delete(self.freeparamnames, removeinds)
             self.freeparamvalues = np.delete(self.freeparamvalues, removeinds)
             self.freeparambounds = np.delete(self.freeparambounds, removeinds, axis=1)

@@ -82,6 +82,7 @@ class RunReader(Talker, Writer):
             else: 
                 print('Error: this wavelenth bin has not been fit')
                 break
+            self.speak('using {0} for wavelength bin {1}'.format(fit, wfile))
 
             self.results['allwavelims'].append(wavebin['wavelims'])
             self.results['allmidwave'].append(np.mean(wavebin['wavelims']))

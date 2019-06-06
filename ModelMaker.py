@@ -44,7 +44,7 @@ class ModelMaker(Talker):
             for t, tranlabel in enumerate(self.inputs[subdir]['tranlabels']):
                 if tranlabel+str(n) in self.wavebin['freeparamnames']:
                     paramind = np.argwhere(self.wavebin['freeparamnames'] == tranlabel+str(n))[0][0]
-                    # need to reparameterize t0 u0 and u1
+                    # need to reparameterize u0 and u1
                     if tranlabel == 'u0': 
                         if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (75./34.)*self.params[paramind] + (45./34.)*self.params[paramind+1]
                         elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (2./5.)*self.params[paramind] + (1./5.)*self.params[paramind+1]
@@ -52,11 +52,18 @@ class ModelMaker(Talker):
                         if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (45./34.)*self.params[paramind-1] - (75./34.)*self.params[paramind]
                         elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (1./5.)*self.params[paramind-1] - (2./5.)*self.params[paramind]
                     else: tranvalues[subdir][tranlabel] = self.params[paramind]
-                elif tranlabel in self.inputs['jointparams']:
+                elif (tranlabel in self.inputs['jointparams']) and (tranlabel+str(0) in self.wavebin['freeparamnames']):
                     jointset = self.wavebin['subdirectories'][0]
                     jointind = np.argwhere(np.array(self.inputs['subdirectories']) == jointset)[0][0]
                     paramind =  np.argwhere(np.array(self.wavebin['freeparamnames']) == tranlabel+str(jointind))[0][0]
-                    tranvalues[subdir][tranlabel] = self.params[paramind]
+                    # need to reparameterize u0 and u1
+                    if tranlabel == 'u0': 
+                        if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (75./34.)*self.params[paramind] + (45./34.)*self.params[paramind+1]
+                        elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (2./5.)*self.params[paramind] + (1./5.)*self.params[paramind+1]
+                    elif tranlabel == 'u1': 
+                        if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (45./34.)*self.params[paramind-1] - (75./34.)*self.params[paramind]
+                        elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (1./5.)*self.params[paramind-1] - (2./5.)*self.params[paramind]
+                    else: tranvalues[subdir][tranlabel] = self.params[paramind]
                     #tranvalues[subdir][tranlabel] = tranvalues[subdir][tranlabel]
                 else: 
                     # need to reparameterize to u0 and u1 (these were set to v0 and v1 during the ldtkparams step of lmfitter
