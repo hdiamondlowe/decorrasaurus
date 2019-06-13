@@ -11,7 +11,7 @@ from scipy.signal import resample
 from scipy.special import gammainc
 
 class RunReader(Talker, Writer):
-    '''Detrenders are objects for detrending data output by mosasaurus.'''
+    '''RunReader takes your decorrasaurus run and amalgamates the results'''
 
     def __init__(self, *rundirectory):
         '''initialize from an input.init file'''
@@ -88,10 +88,12 @@ class RunReader(Talker, Writer):
             self.results['allmidwave'].append(np.mean(wavebin['wavelims']))
 
             for i, fitparam in enumerate(wavebin[fit]['freeparamnames']):
-                self.results['allparamnames'].append(fitparam)
-                if fitparam[:-1] in self.inputs['jointparams']: fitparam = fitparam[:-1]+str(0)
+                firstdir = wavebin['subdirectories'][0]
+                if fitparam[:-1] in self.inputs['jointparams']: fitparam = fitparam[:-1]+self.inputs[firstdir]['n']
+                if fitparam not in self.results['allparamnames']: self.results['allparamnames'].append(fitparam)
                 self.results.setdefault(fitparam, []).append(wavebin[fit]['values'][i])
                 self.results.setdefault(fitparam+'_unc', []).append(wavebin[fit]['uncs'][i])
+                #print(wfile, fitparam)
 
             if fit == 'lmfit':
                 self.results['ldparams']['v0'].append(wavebin['ldparams']['v0'])

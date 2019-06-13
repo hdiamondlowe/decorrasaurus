@@ -38,11 +38,13 @@ class ModelMaker(Talker):
             self.fitmodel[subdir] = (polymodel + parammodel + 1)
 
         tranvalues = {}
+        firstdir = self.wavebin['subdirectories'][0]
+        firstn = self.inputs[firstdir]['n']
         for subdir in self.wavebin['subdirectories']:
             tranvalues[subdir] = {}
             n = self.inputs[subdir]['n']
             for t, tranlabel in enumerate(self.inputs[subdir]['tranlabels']):
-                if tranlabel+str(n) in self.wavebin['freeparamnames']:
+                if tranlabel+n in self.wavebin['freeparamnames']:
                     paramind = np.argwhere(self.wavebin['freeparamnames'] == tranlabel+str(n))[0][0]
                     # need to reparameterize u0 and u1
                     if tranlabel == 'u0': 
@@ -52,10 +54,8 @@ class ModelMaker(Talker):
                         if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (45./34.)*self.params[paramind-1] - (75./34.)*self.params[paramind]
                         elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (1./5.)*self.params[paramind-1] - (2./5.)*self.params[paramind]
                     else: tranvalues[subdir][tranlabel] = self.params[paramind]
-                elif (tranlabel in self.inputs['jointparams']) and (tranlabel+str(0) in self.wavebin['freeparamnames']):
-                    jointset = self.wavebin['subdirectories'][0]
-                    jointind = np.argwhere(np.array(self.inputs['subdirectories']) == jointset)[0][0]
-                    paramind =  np.argwhere(np.array(self.wavebin['freeparamnames']) == tranlabel+str(jointind))[0][0]
+                elif (tranlabel in self.inputs['jointparams']) and (tranlabel+firstn in self.wavebin['freeparamnames']):
+                    paramind =  np.argwhere(np.array(self.wavebin['freeparamnames']) == tranlabel+firstn)[0][0]
                     # need to reparameterize u0 and u1
                     if tranlabel == 'u0': 
                         if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (75./34.)*self.params[paramind] + (45./34.)*self.params[paramind+1]

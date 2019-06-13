@@ -1,5 +1,4 @@
 from .imports import *
-from .ModelMaker import ModelMaker
 from scipy.stats import norm
 from matplotlib.ticker import MaxNLocator
 import corner

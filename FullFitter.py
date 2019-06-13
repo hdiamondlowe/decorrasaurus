@@ -169,26 +169,30 @@ class FullFitter(Talker, Writer):
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
 
     def runFullFit_dynesty(self):
+        
+        # get the subdirecotry index of the first subdirectory used in this wavebin
+        firstdir = self.wavebin['subdirectories'][0]
+        firstn = self.inputs[firstdir]['n']
 
         # limb darkening parameters were fixed in the Levenberg-Marquardt fits but now we want to fit for them
         self.freeparamnames = self.wavebin['lmfit']['freeparamnames']
         self.freeparamvalues = self.wavebin['lmfit']['freeparamvalues']
         self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
 
-        # append u0+str(0) to the free paramnames
-        self.freeparamnames = np.append(self.freeparamnames, 'u00')
+        # append u0+firstn to the free paramnames
+        self.freeparamnames = np.append(self.freeparamnames, 'u0'+firstn)
         self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v0'])
         # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
         self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
-        # append u1+str(0) to the free paramnames
-        self.freeparamnames = np.append(self.freeparamnames, 'u10')
+        # append u1+firstn to the free paramnames
+        self.freeparamnames = np.append(self.freeparamnames, 'u1'+firstn)
         self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v1'])
         self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
                 
         # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
         for subdir in self.wavebin['subdirectories']:
-            n = np.argwhere(np.array(self.inputs['subdirectories']) == subdir)[0][0]
-            self.freeparamnames = np.append(self.freeparamnames, 's'+str(n))
+            n = self.inputs[subdir]['n']
+            self.freeparamnames = np.append(self.freeparamnames, 's'+n)
             self.freeparamvalues = np.append(self.freeparamvalues, 1)
             self.freeparambounds = np.append(self.freeparambounds, [[0.01], [10.]], axis=1)
 
