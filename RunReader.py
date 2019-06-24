@@ -89,7 +89,7 @@ class RunReader(Talker, Writer):
 
             for i, fitparam in enumerate(wavebin[fit]['freeparamnames']):
                 firstdir = wavebin['subdirectories'][0]
-                if fitparam[:-1] in self.inputs['jointparams']: fitparam = fitparam[:-1]+self.inputs[firstdir]['n']
+                if fitparam[:-1] in self.inputs['jointparams']: fitparam = fitparam[:-1]
                 if fitparam not in self.results['allparamnames']: self.results['allparamnames'].append(fitparam)
                 self.results.setdefault(fitparam, []).append(wavebin[fit]['values'][i])
                 self.results.setdefault(fitparam+'_unc', []).append(wavebin[fit]['uncs'][i])
