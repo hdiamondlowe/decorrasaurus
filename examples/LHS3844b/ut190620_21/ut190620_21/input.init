@@ -1,0 +1,75 @@
+filename         binall-testing
+nightname        ut190620_21
+datacubepath     spectralCube_LHS3844b_ut190620_21_2stars_167spectra_06px_shifted.npy
+specstretchpath  spectralstretch.npy
+fitlabels        airmass rotangle width shift peak
+polyfit          2
+#['airmass', 'rotangle', 'pwv', 'centroid', 'width', 'shift', 'stretch', 'raw_counts', 'sky', 'dcentroid', 'dwidth', 'peak'] 
+
+# stellar parameters for limb-darkening fitting
+# Teff [K] = effective temperature; logg = log of surface gravity; z = metallicity; ldlaw =  LDTk limb darkening fitting law
+Teff             3036
+Teff_unc         77
+logg             5.06
+logg_unc         0.01
+z                -0.24
+z_unc            0.10
+ldlaw              qd
+
+# planet parameters for transit model fitting
+# T0 [BJD]; P [days]; Tdur [days]; b is impact parameter; a is scaled semi-major axis (a/Rs)
+T0               2458325.72568
+P                0.46292792
+Tdur             0.02158333
+inc              88.22   
+a                7.1059 
+ecc              0.
+omega            90.
+epochnum         713
+
+# transit model code to use; 'batman' or 'robin'
+modelcode        batman
+
+# set transit parameters and whether or not they should be free or fixed
+tranlabels       dt               rp        per       inc       a        ecc     omega 	   u0    u1
+tranparams       0.00             0.0640    P         inc      a         ecc     omega     -0.121379514238 0.847780824455
+tranbounds_low   False            True      False     True     True     False   False	    False    False
+tranbounds_high  False            True      False     True    True     False   False      False    False
+jointparams      
+wavelength_lims  6100 10100
+#wavelength_lims  7950 8150
+#wavelength_lims  8400 8600
+
+# choose whether to detrend against the target or the sum of the comparisons; 'target' or 'comparisons'
+against          comparisons
+
+# how many angstroms do you want in a wavelength bin; if white light curve say 'all;='
+binlen           all
+
+# sigma clipping; how many times the data uncertainty to go when clipping
+sigclip          5.
+
+# times transit duration; how many times the transit duration to extend on either side of the transit
+timesTdur        1.5
+
+# clip data points in the middle of the transit, like for a starspot?
+#midclip_inds      75 155
+midclip_inds     False
+
+# sampling code to use; 'emcee' or 'dynesty'
+samplecode       dynesty
+
+# emcee (mcmc) paramteres
+nwalkers         200
+nsteps           100000
+burnin           2500
+
+# toggle some options
+optext           False
+istarget         True
+isasymm          False
+invvar           False
+dividewhite 	 False
+ldmodel          True
+fullsample       False
+makeplots        True
