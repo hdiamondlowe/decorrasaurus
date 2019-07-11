@@ -27,8 +27,9 @@ class WaveBinner(Talker):
                 np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
             else: 
                 self.makeBinIndices()
-                self.speak('saving wavefiles to subcube')
-                np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
+                if self.inputs['fullsample']:
+                    self.speak('saving wavefiles to subcube')
+                    np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
 
 
     def makeBinIndices(self):

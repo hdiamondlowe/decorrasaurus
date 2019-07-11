@@ -24,8 +24,9 @@ class CubeReader(Talker):
                 self.datacubepath = self.inputs[subdir]['datacubepath']
                 self.specstretchpath = self.inputs[subdir]['specstretchpath']
                 self.makeSubCube()
-            np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
-            self.speak('subcube saved')
+            if self.inputs['fullsample']:
+                np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
+                self.speak('subcube saved')
 
             if self.inputs['makeplots']:
                 plot = Plotter(self.inputs, self.subcube)
@@ -47,7 +48,7 @@ class CubeReader(Talker):
         #subcube['comparisons'] = [cube['comparisons'][3]]
 
         subcube['mosasaurusok'] = deepcopy(cube['temporal']['ok'])     # (time)
-        subcube['trimmedok'] = np.ones_like(subcube['mosasaurusok'])  # (time) making this ahead of time for when we trim the light curve in time (LCMaker)
+        subcube['trimmedok'] = np.ones_like(subcube['mosasaurusok'])      # (time) making this ahead of time for when we trim the light curve in time (LCMaker)
         subcube['bjd'] = deepcopy(cube['temporal']['bjd'])             # (time)
         subcube['airmass'] = deepcopy(cube['temporal']['airmass'])     # (time)
         subcube['rotangle'] = deepcopy(cube['temporal']['rotatore'])   # (time)
