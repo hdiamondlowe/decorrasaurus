@@ -87,8 +87,10 @@ class RunReader(Talker, Writer):
             self.results['allwavelims'].append(wavebin['wavelims'])
             self.results['allmidwave'].append(np.mean(wavebin['wavelims']))
 
+            firstdir = wavebin['subdirectories'][0]
+            firstn = self.inputs[firstdir]['n']
+
             for i, fitparam in enumerate(wavebin[fit]['freeparamnames']):
-                firstdir = wavebin['subdirectories'][0]
                 if fitparam[:-1] in self.inputs['jointparams']: fitparam = fitparam[:-1]
                 if fitparam not in self.results['allparamnames']: self.results['allparamnames'].append(fitparam)
                 self.results.setdefault(fitparam, []).append(wavebin[fit]['values'][i])
@@ -101,7 +103,7 @@ class RunReader(Talker, Writer):
                 self.results['ldparams']['v0_unc'].append(wavebin['ldparams']['v0_unc'])
                 self.results['ldparams']['v1_unc'].append(wavebin['ldparams']['v1_unc']) 
             elif fit == 'mcfit':
-                i = np.argwhere(wavebin['freeparamnames'] == 'u00')[0][0]
+                i = np.argwhere(wavebin['freeparamnames'] == 'u0'+firstn)[0][0]
                 self.results['ldparams']['v0'].append(wavebin[fit]['values'][i])
                 self.results['ldparams']['v1'].append(wavebin[fit]['values'][i+1])
                 self.results['ldparams']['v0_unc'].append(np.mean(wavebin[fit]['uncs'][i]))
