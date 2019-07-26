@@ -54,7 +54,9 @@ class LCMaker(Talker, Writer):
 
         # get a list of all the possible wavebin names from all data sets
         allwavefiles = [self.wavebin.wavefiles[subdir] for subdir in self.subdirectories]
-        self.allwavefiles = sorted(list(set(np.concatenate(allwavefiles))))
+        # sort by ascending order (trickly with strings; we don't want bin 10100-10300 to come before bin 6100-6300
+        self.allwavefiles = list(set(np.concatenate(allwavefiles)))
+        self.allwavefiles.sort(key = lambda f: float(f.split('-')[0]))
 
         allwavelims = [self.wavebin.wavelims[subdir] for subdir in self.subdirectories]
         self.allwavelims = sorted(list(set([tuple(wavelim) for wavelim in np.concatenate(allwavelims)])))
