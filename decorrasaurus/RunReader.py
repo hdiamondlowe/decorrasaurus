@@ -53,7 +53,8 @@ class RunReader(Talker, Writer):
         self.results = {}
 
         # get a concatenated list of wavefiles and all possible fitted values
-        self.results['allwavefiles'] = sorted(list(set(np.concatenate(([self.subcube[subdir]['wavefiles'] for subdir in self.inputs['subdirectories']])))))
+        self.results['allwavefiles'] = list(set(np.concatenate(([self.subcube[subdir]['wavefiles'] for subdir in self.inputs['subdirectories']]))))
+        self.results['allwavefiles'].sort(key = lambda f: float(f.split('-')[0]))
         self.results['allwavelims'] = []
         self.results['allmidwave'] = []
         self.results['allparamnames'] = []
