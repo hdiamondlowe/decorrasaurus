@@ -3,6 +3,7 @@ import astrotools.modeldepths as md
 import astropy.units as u
 from .ModelMaker import ModelMaker
 from .Inputs import Inputs
+from .CubeReader import CubeReader
 import collections
 from datetime import datetime
 from ldtk import LDPSetCreator, BoxcarFilter
@@ -46,6 +47,7 @@ class RunReader(Talker, Writer):
         self.inputs = self.inputs.inputs
 
         self.subcube = np.load(self.rundirectory+'subcube.npy')[()]
+
 
     def readrun(self):
         # create and populate a dictionary of run information

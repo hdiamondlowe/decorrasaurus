@@ -4,12 +4,11 @@ from copy import deepcopy
 
 class CubeReader(Talker):
     ''' Reads in all the datacubes from the local subdirectories'''
-    def __init__(self, detrender, subdirectories):
+    def __init__(self, inputs, subdirectories):
 
         Talker.__init__(self)
         
-        self.detrender = detrender
-        self.inputs = self.detrender.inputs.inputs
+        self.inputs = inputs
         self.subdirectories = subdirectories
 
         try: 
@@ -24,9 +23,9 @@ class CubeReader(Talker):
                 self.datacubepath = self.inputs[subdir]['datacubepath']
                 self.specstretchpath = self.inputs[subdir]['specstretchpath']
                 self.makeSubCube()
-            if self.inputs['fullsample']:
-                np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
-                self.speak('subcube saved')
+            #if self.inputs['fullsample']:
+            np.save(self.inputs['directoryname']+'subcube.npy', self.subcube)
+            self.speak('subcube saved')
 
             if self.inputs['makeplots']:
                 plot = Plotter(self.inputs, self.subcube)

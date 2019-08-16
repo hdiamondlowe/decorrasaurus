@@ -19,14 +19,13 @@ class Plotter(Talker):
     def cubeplots(self):
         
         self.speak('plotting raw counts vs wavelength for all stars')
-        colors = ['firebrick', 'darkorange', 'olivedrab', 'dodgerblue', 'darkmagenta']
         for n, subdir in enumerate(self.inputs['subdirectories']):      
             target = self.subcube[subdir]['target']
             comparisons = self.subcube[subdir]['comparisons']
             expind = np.where(self.subcube[subdir]['airmass'] == min(self.subcube[subdir]['airmass']))[0][0] # use a low-airmass exposure
-            plt.plot(self.subcube[subdir]['wavelengths'], self.subcube[subdir]['raw_counts'][target][expind], alpha=0.75, lw=2, color=colors[n])
+            plt.plot(self.subcube[subdir]['wavelengths'], self.subcube[subdir]['raw_counts'][target][expind], alpha=0.6, lw=2, color='C{0}'.format(n%10))
             for comp in comparisons:
-                plt.plot(self.subcube[subdir]['wavelengths'], self.subcube[subdir]['raw_counts'][comp][expind], alpha=0.75, lw=2, color=colors[n])
+                plt.plot(self.subcube[subdir]['wavelengths'], self.subcube[subdir]['raw_counts'][comp][expind], alpha=0.6, lw=2, color='C{0}'.format(n%10))
         plt.xlabel(r'Wavelength ($\AA$)')
         plt.ylabel('Raw Counts (photoelectrons)')
         plt.tight_layout()
@@ -124,19 +123,20 @@ class Plotter(Talker):
                 plt.clf()
                 plt.close()
 
-                self.speak('plotting normalized wavelength binned raw counts vs time for target and summed comparisons for {0}'.format(subdir))
-                plt.figure()
-                binnedsupercomp = np.sum(binnedcomp, 0)
-                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (binnedtarg/np.median(binnedtarg))[self.wavebin[subdir]['binnedok']], '.', alpha=0.5, label=target)
-                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (binnedsupercomp/np.median(binnedsupercomp))[self.wavebin[subdir]['binnedok']], '.', alpha=0.5, label='summedcomp')
-                plt.legend(loc='best')
-                plt.xlabel('BJD-'+str(t0[n]), fontsize=20)
-                plt.ylabel('Normalized Flux', fontsize=20)
-                plt.title(subdir+', '+self.wavefile+' angstroms')
-                plt.tight_layout()
-                plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_wavebinnedtimeseries_summedcomp_'+subdir+'.png')
-                plt.clf()
-                plt.close()
+                if len(self.subcube[subdir]['comparisons']) > 1: 
+                    self.speak('plotting normalized wavelength binned raw counts vs time for target and summed comparisons for {0}'.format(subdir))
+                    plt.figure()
+                    binnedsupercomp = np.sum(binnedcomp, 0)
+                    plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (binnedtarg/np.median(binnedtarg))[self.wavebin[subdir]['binnedok']], '.', alpha=0.5, label=target)
+                    plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (binnedsupercomp/np.median(binnedsupercomp))[self.wavebin[subdir]['binnedok']], '.', alpha=0.5, label='summedcomp')
+                    plt.legend(loc='best')
+                    plt.xlabel('BJD-'+str(t0[n]), fontsize=20)
+                    plt.ylabel('Normalized Flux', fontsize=20)
+                    plt.title(subdir+', '+self.wavefile+' angstroms')
+                    plt.tight_layout()
+                    plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_wavebinnedtimeseries_summedcomp_'+subdir+'.png')
+                    plt.clf()
+                    plt.close()
 
         self.speak('making lightcurve and lmfit model vs time figure')
         for n, subdir in enumerate(self.wavebin['subdirectories']):
@@ -147,14 +147,14 @@ class Plotter(Talker):
             lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
 
             # plot the points that were used in the fit
-            lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'o', color='C'+self.inputs[subdir]['n'], markeredgecolor='none', alpha=0.5)
+            lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
             # plot the points that were not used
             #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=16)
     
-            lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C'+self.inputs[subdir]['n'], markeredgecolor='none', alpha=0.5)
+            lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
             #lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
             lcplots['residuals'][0].set_xlabel('BJD-'+str(t0), fontsize=16)
@@ -182,7 +182,7 @@ class Plotter(Talker):
             self.speak('plotting lmfit detrended lightcurve with batman model vs time')
             plt.figure()
             for n, subdir in enumerate(self.wavebin['subdirectories']):
-                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C'+self.inputs[subdir]['n'], markeredgecolor='none', alpha=0.5)
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
             for n, subdir in enumerate(self.wavebin['subdirectories']):
                 plt.plot(self.subcube[subdir]['bjd']-t0[n], batmanmodels[subdir], 'k-', lw=2, alpha=0.5)
             plt.xlabel('time from mid-transit [days]', fontsize=20)
@@ -288,7 +288,7 @@ class Plotter(Talker):
         self.speak('plotting fullfit detrended lightcurve with batman model vs time')
         plt.figure()
         for n, subdir in enumerate(self.wavebin['subdirectories']):
-            plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C'+self.inputs[subdir]['n'], markeredgecolor='none', alpha=0.5)
+            plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             plt.plot(self.subcube[subdir]['bjd']-t0[n], batmanmodels[subdir], 'k-', lw=2)
         plt.xlabel('Time from Mid-Transit (days)', fontsize=20)

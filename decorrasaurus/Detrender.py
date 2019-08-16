@@ -41,7 +41,7 @@ class Detrender(Talker, Writer):
             self.directoryname = self.inputs.directoryname
 
         # try first loading in a saved minicube; if it doesn't exist read in the whole original cube
-        self.cube = CubeReader(self, self.subdirectories)
+        self.cube = CubeReader(self.inputs.inputs, self.subdirectories)
 
         # try first to look for the files with the lcs already in them, eg. '7000.npy'
         self.lcs = LCMaker(self, self.subdirectories)
