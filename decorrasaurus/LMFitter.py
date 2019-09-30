@@ -25,13 +25,16 @@ class LMFitter(Talker, Writer):
 
         self.wavebin = np.load(self.savewave+'.npy')[()]
         subdirs = self.wavebin.keys()
+
         if self.wavebin['lmfitdone']:
             self.speak('lmfit already exists for wavelength bin {0}'.format(self.wavefile))
+
         else: 
             self.speak('running lmfit for wavelength bin {0}'.format(self.wavefile))
+            self.setup()
             self.runLMFit()
 
-    def runLMFit(self):
+    def setup(self):
 
         if self.inputs['ldmodel']:
             self.limbdarkparams(self.wavebin['wavelims'][0]/10., self.wavebin['wavelims'][1]/10.)
@@ -56,6 +59,14 @@ class LMFitter(Talker, Writer):
 
         self.wavebin['freeparamnames'] = self.freeparamnames
 
+        self.lcs = np.array([self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']])
+        self.photnoiseest = np.array([self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']])
+        self.binnedok = np.array([self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']])
+
+        self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
+
+    def runLMFit(self):
+
         self.speak('running first lmfit scaling by photon noise limits')#, making output txt file')
 
         lmfitparams = lmfit.Parameters()
@@ -67,25 +78,24 @@ class LMFitter(Talker, Writer):
             else: maxbound = self.freeparambounds[1][n]
             lmfitparams[name].set(min=minbound, max=maxbound)
 
-
+        model = ModelMaker(self.inputs, self.wavebin, np.array(self.freeparamvalues))
         def lineareqn(params):
-            paramvals = [params[name].value for name in self.freeparamnames]
-            model = ModelMaker(self.inputs, self.wavebin, paramvals)
-            return model.makemodel()
+            return model.makemodel(np.array(list(params.valuesdict().values())))
+
 
         def residuals1(params):
-            model = lineareqn(params)
-            residuals = []
-            for subdir in self.wavebin['subdirectories']:
+            models = lineareqn(params)
+            residuals = [((self.lcs[i] - models[i])/self.photnoiseest[i])[self.binnedok[i]] for i in self.rangeofdirectories]
+            #for subdir in self.wavebin['subdirectories']:
                 # weight by photon noise limit (expected noise); only include binnedok points in residuals - don't want masked points to determine goodness of fit
-                residuals.append(((self.wavebin[subdir]['lc'] - model[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])
+            #    residuals.append(((self.wavebin[subdir]['lc'] - model[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])
             return np.hstack(residuals)
 
 
         fit_kws={'epsfcn':1e-5}  # set the stepsize to something small but reasonable; withough this lmfit may have trouble perturbing values
             #, 'full_output':True, 'xtol':1e-5, 'ftol':1e-5, 'gtol':1e-5}
         self.linfit1 = lmfit.minimize(fcn=residuals1, params=lmfitparams, method='leastsq', **fit_kws)
-        linfit1paramvals = [self.linfit1.params[name].value for name in self.freeparamnames]
+        linfit1paramvals = list(self.linfit1.params.valuesdict().values())
         linfit1uncs = np.sqrt(np.diagonal(self.linfit1.covar))
         self.write('1st lm params:')
         [self.write('    '+self.freeparamnames[i]+'    '+str(linfit1paramvals[i])+'  +/-  '+str(linfit1uncs[i])) for i in range(len(self.freeparamnames))]
@@ -95,11 +105,10 @@ class LMFitter(Talker, Writer):
         self.speak('running second lmfit after clipping >{0} sigma points'.format(self.inputs['sigclip']))
  
        # median absolute deviation sigma clipping to specified sigma value from inputs
-        linfit1paramvals = [self.linfit1.params[name].value for name in self.freeparamnames]
-        modelobj = ModelMaker(self.inputs, self.wavebin, linfit1paramvals)
-        models = modelobj.makemodel()
-        for subdir in self.wavebin['subdirectories']:
-            resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']] # don't include masked points in residuals
+        model = ModelMaker(self.inputs, self.wavebin, np.array(linfit1paramvals))
+        models = model.makemodel(np.array(linfit1paramvals))
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            resid = (self.wavebin[subdir]['lc'] - models[s])[self.wavebin[subdir]['binnedok']] # don't include masked points in residuals
 
             # median absolute deviation
             mad = np.median(abs(resid - np.median(resid)))
@@ -118,7 +127,7 @@ class LMFitter(Talker, Writer):
             # save new 'binnedok' to wavebin to be used later
             self.write('clipped points for {0}: {1}'.format(subdir, clipinds))
             np.save(self.savewave, self.wavebin)
-
+        self.binnedok = np.array([self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']])
 
         lmfitparams = lmfit.Parameters()
         for n, name in enumerate(self.freeparamnames):
@@ -129,17 +138,17 @@ class LMFitter(Talker, Writer):
             else: maxbound = self.freeparambounds[1][n]
             lmfitparams[name].set(min=minbound, max=maxbound)
 
-
         def residuals2(params):
             models = lineareqn(params)
-            residuals = []
-            for subdir in self.wavebin['subdirectories']:
+            residuals = [((self.lcs[i] - models[i])/self.photnoiseest[i])[self.binnedok[i]] for i in self.rangeofdirectories]
+            #residuals = []
+            #for subdir in self.wavebin['subdirectories']:
                 # weight by photon noise limit (expected noise); only include binnedok points in residuals - don't want masked points to determine goodness of fit
-                residuals.append(((self.wavebin[subdir]['lc'] - models[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']]) 
+            #    residuals.append(((self.wavebin[subdir]['lc'] - models[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']]) 
             return np.hstack(residuals)
 
         self.linfit2 = lmfit.minimize(fcn=residuals2, params=lmfitparams, method='leastsq', **fit_kws)
-        linfit2paramvals = [self.linfit2.params[name].value for name in self.freeparamnames]
+        linfit2paramvals = list(self.linfit2.params.valuesdict().values())
         linfit2uncs = np.sqrt(np.diagonal(self.linfit2.covar))
         self.write('2nd lm params:')
         [self.write('    '+self.freeparamnames[i]+'    '+str(linfit2paramvals[i])+'  +/-  '+str(linfit2uncs[i])) for i in range(len(self.freeparamnames))]
@@ -157,26 +166,25 @@ class LMFitter(Talker, Writer):
             else: maxbound = self.freeparambounds[1][n]
             lmfitparams[name].set(min=minbound, max=maxbound)
 
-        linfit2paramvals = [self.linfit2.params[name].value for name in self.freeparamnames]
-        modelobj = ModelMaker(self.inputs, self.wavebin, linfit2paramvals)
-        models = modelobj.makemodel()
+        model = ModelMaker(self.inputs, self.wavebin, np.array(linfit2paramvals))
+        models = model.makemodel(np.array(linfit2paramvals))
         data_uncs2 = []
-        for subdir in self.wavebin['subdirectories']:
-            resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']]
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            resid = (self.wavebin[subdir]['lc'] - models[s])[self.wavebin[subdir]['binnedok']]
             data_unc = np.std(resid)
             data_uncs2.append(data_unc)
         self.write('lmfit2 data uncs: {0}'.format(data_uncs2))
 
         def residuals3(params):
             models = lineareqn(params)
-            residuals = []
-            for n, subdir in enumerate(self.wavebin['subdirectories']):
+            residuals = [((self.lcs[i] - models[i])/data_uncs2[i])[self.binnedok[i]] for i in self.rangeofdirectories]
+            #for n, subdir in enumerate(self.wavebin['subdirectories']):
                 # weight by calculated uncertainty; only include binnedok points in residuals - don't want masked points to determine goodness of fit
-                residuals.append(((self.wavebin[subdir]['lc'] - models[subdir])/data_uncs2[n])[self.wavebin[subdir]['binnedok']])
+            #    residuals.append(((self.wavebin[subdir]['lc'] - models[subdir])/data_uncs2[n])[self.wavebin[subdir]['binnedok']])
             return np.hstack(residuals)
 
         self.linfit3 = lmfit.minimize(fcn=residuals3, params=lmfitparams, method='leastsq', **fit_kws)
-        linfit3paramvals = [self.linfit3.params[name].value for name in self.freeparamnames]
+        linfit3paramvals = list(self.linfit3.params.valuesdict().values())
         linfit3uncs = np.sqrt(np.diagonal(self.linfit3.covar))
         self.write('3rd lm params:')
         [self.write('    '+self.freeparamnames[i]+'    '+str(linfit3paramvals[i])+'  +/-  '+str(linfit3uncs[i])) for i in range(len(self.freeparamnames))]
@@ -188,14 +196,13 @@ class LMFitter(Talker, Writer):
                 self.speak('lmfit reseting t0 parameter for {0}, transit midpoint = {1}'.format(subdir, self.inputs[subdir]['t0']))
             self.write('lmfit transit midpoint for {0}: {1}'.format(subdir, self.inputs[subdir]['t0']))
 
-        linfit3paramvals = [self.linfit3.params[name].value for name in self.freeparamnames]
-        modelobj = ModelMaker(self.inputs, self.wavebin, linfit3paramvals)
-        models = modelobj.makemodel()
+        model = ModelMaker(self.inputs, self.wavebin, np.array(linfit3paramvals))
+        models = model.makemodel(np.array(linfit3paramvals))
 
-        resid = []
-        for subdir in self.wavebin['subdirectories']:
+        resid = [(self.lcs[i] - models[i])[self.binnedok[i]] for i in self.rangeofdirectories]
+        #for subdir in self.wavebin['subdirectories']:
             # calculate the residuals and only include the binnedok values
-            resid.append((self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']])
+        #    resid.append((self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']])
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('lmfit overall RMS: {0}'.format(data_unc))  # this is the same as the rms!
@@ -222,8 +229,13 @@ class LMFitter(Talker, Writer):
         if not np.all(np.isfinite(np.array(self.wavebin['lmfit']['uncs']))): 
             self.speak('lmfit error: there were non-finite uncertainties')
             return
-        self.wavebin['lmfit']['fitmodels'] = modelobj.fitmodel
-        self.wavebin['lmfit']['batmanmodels'] = modelobj.batmanmodel
+        fitmodel = {}
+        batmanmodel = {}
+        for s, subdir in enumerate(self.wavebin['subdirectories']): 
+            fitmodel[subdir] = model.fitmodel[s]
+            batmanmodel[subdir] = model.batmanmodel[s]
+        self.wavebin['lmfit']['fitmodels'] = fitmodel
+        self.wavebin['lmfit']['batmanmodels'] = batmanmodel
         self.wavebin['lmfitdone'] = True
         np.save(self.savewave, self.wavebin)
 
