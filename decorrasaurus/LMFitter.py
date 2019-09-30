@@ -78,17 +78,15 @@ class LMFitter(Talker, Writer):
             else: maxbound = self.freeparambounds[1][n]
             lmfitparams[name].set(min=minbound, max=maxbound)
 
-        model = ModelMaker(self.inputs, self.wavebin, np.array(self.freeparamvalues))
+        model = ModelMaker(self.inputs, self.wavebin)
         def lineareqn(params):
             return model.makemodel(np.array(list(params.valuesdict().values())))
 
-
+        # weight first residuals by photon noise limit (expected noise); 
+        # only include binnedok points in residuals - don't want masked points to determine goodness of fit
         def residuals1(params):
             models = lineareqn(params)
             residuals = [((self.lcs[i] - models[i])/self.photnoiseest[i])[self.binnedok[i]] for i in self.rangeofdirectories]
-            #for subdir in self.wavebin['subdirectories']:
-                # weight by photon noise limit (expected noise); only include binnedok points in residuals - don't want masked points to determine goodness of fit
-            #    residuals.append(((self.wavebin[subdir]['lc'] - model[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])
             return np.hstack(residuals)
 
 
@@ -104,8 +102,8 @@ class LMFitter(Talker, Writer):
         
         self.speak('running second lmfit after clipping >{0} sigma points'.format(self.inputs['sigclip']))
  
-       # median absolute deviation sigma clipping to specified sigma value from inputs
-        model = ModelMaker(self.inputs, self.wavebin, np.array(linfit1paramvals))
+        # median absolute deviation sigma clipping to specified sigma value from inputs
+        model = ModelMaker(self.inputs, self.wavebin)
         models = model.makemodel(np.array(linfit1paramvals))
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             resid = (self.wavebin[subdir]['lc'] - models[s])[self.wavebin[subdir]['binnedok']] # don't include masked points in residuals
@@ -166,7 +164,7 @@ class LMFitter(Talker, Writer):
             else: maxbound = self.freeparambounds[1][n]
             lmfitparams[name].set(min=minbound, max=maxbound)
 
-        model = ModelMaker(self.inputs, self.wavebin, np.array(linfit2paramvals))
+        model = ModelMaker(self.inputs, self.wavebin)
         models = model.makemodel(np.array(linfit2paramvals))
         data_uncs2 = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
@@ -196,7 +194,7 @@ class LMFitter(Talker, Writer):
                 self.speak('lmfit reseting t0 parameter for {0}, transit midpoint = {1}'.format(subdir, self.inputs[subdir]['t0']))
             self.write('lmfit transit midpoint for {0}: {1}'.format(subdir, self.inputs[subdir]['t0']))
 
-        model = ModelMaker(self.inputs, self.wavebin, np.array(linfit3paramvals))
+        model = ModelMaker(self.inputs, self.wavebin)
         models = model.makemodel(np.array(linfit3paramvals))
 
         resid = [(self.lcs[i] - models[i])[self.binnedok[i]] for i in self.rangeofdirectories]

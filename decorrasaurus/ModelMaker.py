@@ -7,7 +7,7 @@ from RobinLC import RobinLC
 
 class ModelMaker(Talker):
 
-    def __init__(self, inputs, wavebin, params):
+    def __init__(self, inputs, wavebin):
         ''' initialize the model maker'''
         Talker.__init__(self)
 
@@ -141,78 +141,9 @@ class ModelMaker(Talker):
         sysmodels = [np.sum([np.multiply(params[self.sysparaminds[i]], self.sysparamarrays[i].T).T], axis=0) for i in self.rangeofdirectories]
         self.fitmodel = np.sum([polymodels, sysmodels, self.ones], axis=0)
 
-        # make the transit model wiht batman
+        # make the transit models wiht batman
         self.batmanmodel = [self.update_batman_model(self.batmanparams[i], self.batmanmodels[i], self.batmandictionaries[i], self.batmanupdatenames[i], params[self.batmanparaminds[i]]) for i in self.rangeofdirectories]
 
         return [self.fitmodel[i]*self.batmanmodel[i] for i in self.rangeofdirectories]
 
-
-        #tranvalues = {}
-        #firstdir = self.wavebin['subdirectories'][0]
-        #firstn = self.inputs[firstdir]['n']
-        #for subdir in self.wavebin['subdirectories']:
-        #   tranvalues[subdir] = {}
-        #    n = self.inputs[subdir]['n']
-        #   for t, tranlabel in enumerate(self.inputs[subdir]['tranlabels']):
-        #        if tranlabel+n in self.wavebin['freeparamnames']:
-        #           paramind = np.argwhere(self.wavebin['freeparamnames'] == tranlabel+str(n))[0][0]
-        #            # need to reparameterize u0 and u1
-        #            if tranlabel == 'u0': 
-        #                if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (75./34.)*self.params[paramind] + (45./34.)*self.params[paramind+1]
-        #                elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (2./5.)*self.params[paramind] + (1./5.)*self.params[paramind+1]
-        #            elif tranlabel == 'u1': 
-        #                if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (45./34.)*self.params[paramind-1] - (75./34.)*self.params[paramind]
-        #                elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (1./5.)*self.params[paramind-1] - (2./5.)*self.params[paramind]
-        #            else: tranvalues[subdir][tranlabel] = self.params[paramind]
-        #        elif (tranlabel in self.inputs['jointparams']) and (tranlabel+firstn in self.wavebin['freeparamnames']):
-        #            paramind =  np.argwhere(np.array(self.wavebin['freeparamnames']) == tranlabel+firstn)[0][0]
-        #            # need to reparameterize u0 and u1
-        #            if tranlabel == 'u0': 
-        #                if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (75./34.)*self.params[paramind] + (45./34.)*self.params[paramind+1]
-        #                elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (2./5.)*self.params[paramind] + (1./5.)*self.params[paramind+1]
-        #            elif tranlabel == 'u1': 
-        ###                if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (45./34.)*self.params[paramind-1] - (75./34.)*self.params[paramind]
-          ###              elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (1./5.)*self.params[paramind-1] - (2./5.)*self.params[paramind]
-            #        else: tranvalues[subdir][tranlabel] = self.params[paramind]
-            #        #tranvalues[subdir][tranlabel] = tranvalues[subdir][tranlabel]
-            #    else: 
-            ##        # need to reparameterize to u0 and u1 (these were set to v0 and v1 during the ldtkparams step of lmfitter
-             #       if tranlabel == 'u0': 
-             #           if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (75./34.)*self.inputs[subdir]['tranparams'][t] + (45./34.)*self.inputs[subdir]['tranparams'][t+1]
-             #           elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (2./5.)*self.inputs[subdir]['tranparams'][t] + (1./5.)*self.inputs[subdir]['tranparams'][t+1]
-             #       elif tranlabel == 'u1': 
-             #           if self.inputs['ldlaw'] == 'sq': tranvalues[subdir][tranlabel] = (45./34.)*self.inputs[subdir]['tranparams'][t-1] - (75./34.)*self.inputs[subdir]['tranparams'][t]
-             #           elif self.inputs['ldlaw'] == 'qd': tranvalues[subdir][tranlabel] = (1./5.)*self.inputs[subdir]['tranparams'][t-1] - (2./5.)*self.inputs[subdir]['tranparams'][t]
-             #       else: tranvalues[subdir][tranlabel] = self.inputs[subdir]['tranparams'][t]   
-                    #values[tranlabel] = self.inputs.tranparams[n][t]   
-
-        #print(tranvalues)
-
-        # make the transit model with batman; or some alternative
-        #if self.inputs['istarget'] and not self.inputs['isasymm']:
-        #    self.batmanmodel = {}
-        #    for n, subdir in enumerate(self.wavebin['subdirectories']):
-        #        if self.inputs['modelcode'] == 'batman':
-        #            batman = BatmanLC(times=self.wavebin[subdir]['compcube']['bjd'], t0=(self.inputs[subdir]['toff']+tranvalues[subdir]['dt']), 
-        #                              rp=tranvalues[subdir]['rp'], per=tranvalues[subdir]['per'], inc=tranvalues[subdir]['inc'], a=tranvalues[subdir]['a'], ecc=tranvalues[subdir]['ecc'], omega=tranvalues[subdir]['omega'], 
-        #                              u0=tranvalues[subdir]['u0'], u1=tranvalues[subdir]['u1'], ldlaw=self.inputs['ldlaw'])#, batmanfac=self.inputs.batmanfac)
-        #            batmanmodel = batman.batman_model()
-        #            if n == 0 and np.all(batmanmodel == 1.): self.speak('batman model returned all 1s')
-        #            self.batmanmodel[subdir] = batmanmodel
-        #        elif self.inputs['modelcode'] == 'robin':
-        #            robin = RobinLC(times=self.wavebin[subdir]['compcube']['bjd'], t0=(self.inputs[subdir]['toff']+tranvalues[subdir]['dt']), 
-        #                              p0=tranvalues[subdir]['p0'], p1=tranvalues[subdir]['p1'], 
-        #                              per=tranvalues[subdir]['per'], inc=tranvalues[subdir]['inc'], a=tranvalues[subdir]['a'], ecc=tranvalues[subdir]['ecc'], omega=tranvalues[subdir]['omega'#], 
-        #                              u0=tranvalues[subdir]['u0'], u1=tranvalues[subdir]['u1'], ldlaw=self.inputs['ldlaw'])#, batmanfac=self.inputs.batmanfac)
-        #            robinmodel = robin.robin_model()
-        #            if n == 0 and np.all(robinmodel == 1.): self.speak('robin model returned all 1s')
-        #            self.batmanmodel[subdir] = robinmodel
-
-        
-        # models to return
-
-            #fullmodel = {}
-            #for s, subdir in enumerate(self.wavebin['subdirectories']):
-            #    fullmodel[subdir] = self.fitmodel[s] * self.batmanmodel[subdir]
-            #return fullmodel
 

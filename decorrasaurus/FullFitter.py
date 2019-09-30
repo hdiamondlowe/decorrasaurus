@@ -42,8 +42,67 @@ class FullFitter(Talker, Writer):
                     self.runFullFit_emcee()
         else: 
             self.speak('running mcfit for wavelength bin {0}'.format(self.wavefile))
+            self.setup()
             if self.inputs['samplecode']   == 'emcee':   self.runFullFit_emcee()
             elif self.inputs['samplecode'] == 'dynesty': self.runFullFit_dynesty()
+
+    def setup(self):
+
+        # get the subdirecotry index of the first subdirectory used in this wavebin
+        firstdir = self.wavebin['subdirectories'][0]
+        self.firstn = self.inputs[firstdir]['n']
+
+        # limb darkening parameters were fixed in the Levenberg-Marquardt fits but now we want to fit for them
+        self.freeparamnames = self.wavebin['lmfit']['freeparamnames']
+        self.freeparamvalues = self.wavebin['lmfit']['freeparamvalues']
+        self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
+
+        # append u0+firstn to the free paramnames
+        self.freeparamnames = np.append(self.freeparamnames, 'u0'+self.firstn)
+        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v0'])
+        # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
+        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+        # append u1+firstn to the free paramnames
+        self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
+        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v1'])
+        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+                
+        # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
+        for subdir in self.wavebin['subdirectories']:
+            n = self.inputs[subdir]['n']
+            self.freeparamnames = np.append(self.freeparamnames, 's'+n)
+            self.freeparamvalues = np.append(self.freeparamvalues, 1)
+            self.freeparambounds = np.append(self.freeparambounds, [[0.01], [10.]], axis=1)
+
+        self.wavebin['freeparamnames'] = self.freeparamnames
+
+        self.mcmcbounds = [[],[]]
+        self.mcmcbounds[0] = [i for i in self.freeparambounds[0]]
+        self.mcmcbounds[1] = [i for i in self.freeparambounds[1]]
+
+        for i, name in enumerate(self.wavebin['lmfit']['freeparamnames']):
+            if self.mcmcbounds[0][i] == True:
+                self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*10.
+            if self.mcmcbounds[1][i] == True: 
+                self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*10.
+
+        self.mcmcbounds = np.array(self.mcmcbounds)
+
+        self.write('lower and upper bounds for mcmc walkers:')
+        for b, name in enumerate(self.freeparamnames):
+            self.write('    '+name + '    '+str(self.mcmcbounds[0][b])+'    '+str(self.mcmcbounds[1][b]))
+
+        self.sinds = []
+        self.photnoiseests = []
+        self.binnedoks = []
+        self.lcs = []
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            self.sinds.append(np.argwhere(np.array(self.freeparamnames) == 's'+n)[0][0])
+            self.photnoiseests.append(self.wavebin[subdir]['photnoiseest'])
+            self.binnedoks.append(self.wavebin[subdir]['binnedok'])
+            self.lcs.append(self.wavebin[subdir]['lc'])
+
+        self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
 
     def runFullFit_emcee(self):
 
@@ -169,66 +228,25 @@ class FullFitter(Talker, Writer):
         self.speak('done with mcfit for wavelength bin {0}'.format(self.wavefile))
 
     def runFullFit_dynesty(self):
-        
-        # get the subdirecotry index of the first subdirectory used in this wavebin
-        firstdir = self.wavebin['subdirectories'][0]
-        firstn = self.inputs[firstdir]['n']
-
-        # limb darkening parameters were fixed in the Levenberg-Marquardt fits but now we want to fit for them
-        self.freeparamnames = self.wavebin['lmfit']['freeparamnames']
-        self.freeparamvalues = self.wavebin['lmfit']['freeparamvalues']
-        self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
-
-        # append u0+firstn to the free paramnames
-        self.freeparamnames = np.append(self.freeparamnames, 'u0'+firstn)
-        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v0'])
-        # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
-        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
-        # append u1+firstn to the free paramnames
-        self.freeparamnames = np.append(self.freeparamnames, 'u1'+firstn)
-        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v1'])
-        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
-                
-        # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
-        for subdir in self.wavebin['subdirectories']:
-            n = self.inputs[subdir]['n']
-            self.freeparamnames = np.append(self.freeparamnames, 's'+n)
-            self.freeparamvalues = np.append(self.freeparamvalues, 1)
-            self.freeparambounds = np.append(self.freeparambounds, [[0.01], [10.]], axis=1)
-
-        self.wavebin['freeparamnames'] = self.freeparamnames
-
-        self.mcmcbounds = [[],[]]
-        self.mcmcbounds[0] = [i for i in self.freeparambounds[0]]
-        self.mcmcbounds[1] = [i for i in self.freeparambounds[1]]
-
-        for i, name in enumerate(self.wavebin['lmfit']['freeparamnames']):
-            if self.mcmcbounds[0][i] == True:
-                self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*10.
-            if self.mcmcbounds[1][i] == True: 
-                self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*10.
-
-        self.write('lower and upper bounds for mcmc walkers:')
-        for b, name in enumerate(self.freeparamnames):
-            self.write('    '+name + '    '+str(self.mcmcbounds[0][b])+'    '+str(self.mcmcbounds[1][b]))
 
         # rescaling uncertainties as a free parameter during the fit (Berta, et al. 2011, references therein)
+        modelobj = ModelMaker(self.inputs, self.wavebin)
         def lnlike(p):
             # test what the priors look like on their own
             #rpind = int(np.where(np.array(self.freeparamnames) == 'rp'+str(0))[0])
             #logl = -0.5 * ((p[rpind] - 0.05)/0.01)**2
             #return logl
-            modelobj = ModelMaker(self.inputs, self.wavebin, p)
-            models = modelobj.makemodel()
-            logl = []
-            for subdir in self.wavebin['subdirectories']:
-                n = self.inputs[subdir]['n']
+
+            models = modelobj.makemodel(p)
+            logl = [-len(self.photnoiseests[i][self.binnedoks[i]]) * np.log(p[self.sinds[i]]) - 0.5*(1./(p[self.sinds[i]]**2))*np.sum((((self.lcs[i] - models[i])/self.photnoiseests[i])[self.binnedoks[i]])**2) for i in self.rangeofdirectories]
+            #for subdir in self.wavebin['subdirectories']:
+            #    n = self.inputs[subdir]['n']
                 # p[sind] is an 's' parameter; if the uncertainties do not need to be re-scaled then s = 1
                 # there is a single 's' parameter for each night's fit - helpful if a dataset is far from the photon noise
-                sind = np.argwhere(np.array(self.freeparamnames) == 's'+n)[0][0]
-                penaltyterm = -len(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) * np.log(p[sind])
-                chi2 = (((self.wavebin[subdir]['lc'] - models[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])**2
-                logl.append(penaltyterm - 0.5*(1./(p[sind]**2))*np.sum(chi2))
+            #    sind = np.argwhere(np.array(self.freeparamnames) == 's'+n)[0][0]
+            #    penaltyterm = -len(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) * np.log(p[sind])
+            #    chi2 = (((self.wavebin[subdir]['lc'] - models[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])**2
+            #    logl.append(penaltyterm - 0.5*(1./(p[sind]**2))*np.sum(chi2))
             return np.sum(logl)
             
         # inverse transform sampling    
@@ -238,20 +256,22 @@ class FullFitter(Talker, Writer):
         ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
         ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['v1'], scale=self.wavebin['ldparams']['v1_unc'])
         ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
+        u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
+        u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
         def ptform(p):
+
             x = np.array(p)
-            for i in range(len(x)):
-                if self.freeparamnames[i] == 'u00':
-                    if x[i] < 0.0001: x[i] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-                    if x[i] > .9999: x[i] = .9999
-                    x[i] = ppf_func_u0(x[i])
-                elif self.freeparamnames[i] == 'u10':
-                    if x[i] < 0.0001: x[i] = 0.0001
-                    if x[i] > .9999: x[i] = .9999
-                    x[i] = ppf_func_u1(x[i])
-                else: 
-                    span = self.mcmcbounds[1][i] - self.mcmcbounds[0][i]
-                    x[i] = x[i]*span + self.mcmcbounds[0][i]
+            span = self.mcmcbounds[1] - self.mcmcbounds[0]
+            x = x*span + self.mcmcbounds[0]
+
+            if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            if x[u0ind] > .9999: x[u0ind] = .9999
+            x[u0ind] = ppf_func_u0(x[u0ind])
+
+            if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            if x[u1ind] > .9999: x[u1ind] = .9999
+            x[u1ind] = ppf_func_u1(x[u1ind])
+
             return x
 
         ndim = len(self.freeparamnames)
@@ -281,11 +301,9 @@ class FullFitter(Talker, Writer):
         [self.write('     '+self.freeparamnames[i]+'     '+str(self.mcparams[i][0])+'     '+str(self.mcparams[i][1])+'     '+str(self.mcparams[i][2])) for i in range(len(self.freeparamnames))]
 
         #calculate rms from mcfit
-        modelobj = ModelMaker(self.inputs, self.wavebin, self.mcparams[:,0])
-        models = modelobj.makemodel()
-        resid = []
-        for subdir in self.wavebin['subdirectories']:
-            resid.append((self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']])
+        modelobj = ModelMaker(self.inputs, self.wavebin)
+        models = modelobj.makemodel(self.mcparams[:,0])
+        resid = [(self.lcs[i] - models[i])[self.binnedoks[i]] for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('mcfit overall RMS: '+str(data_unc))
@@ -295,8 +313,13 @@ class FullFitter(Talker, Writer):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
         self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) for n in range(len(self.wavebin['subdirectories']))])))
 
-        self.wavebin['mcfit']['fitmodels'] = modelobj.fitmodel
-        self.wavebin['mcfit']['batmanmodels'] = modelobj.batmanmodel
+        fitmodel = {}
+        batmanmodel = {}
+        for s, subdir in enumerate(self.wavebin['subdirectories']): 
+            fitmodel[subdir] = models.fitmodel[s]
+            batmanmodel[subdir] = models.batmanmodel[s]
+        self.wavebin['mcfit']['fitmodels'] = fitmodel
+        self.wavebin['mcfit']['batmanmodels'] = batmanmodel
         self.wavebin['mcfit']['freeparamnames'] = self.freeparamnames
         self.wavebin['mcfit']['freeparamvalues'] = self.freeparamvalues
         self.wavebin['mcfit']['freeparambounds'] = self.freeparambounds
