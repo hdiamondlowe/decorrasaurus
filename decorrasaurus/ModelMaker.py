@@ -2,8 +2,6 @@
 
 from imports import *
 import batman
-from BatmanLC import BatmanLC
-from RobinLC import RobinLC
 
 class ModelMaker(Talker):
 

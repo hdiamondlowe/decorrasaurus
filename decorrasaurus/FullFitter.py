@@ -97,7 +97,7 @@ class FullFitter(Talker, Writer):
         self.binnedoks = []
         self.lcs = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
-            self.sinds.append(np.argwhere(np.array(self.freeparamnames) == 's'+n)[0][0])
+            self.sinds.append(np.argwhere(np.array(self.freeparamnames) == 's{}'.format(s))[0][0])
             self.photnoiseests.append(self.wavebin[subdir]['photnoiseest'])
             self.binnedoks.append(self.wavebin[subdir]['binnedok'])
             self.lcs.append(self.wavebin[subdir]['lc'])

@@ -290,7 +290,7 @@ class Plotter(Talker):
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
         for n, subdir in enumerate(self.wavebin['subdirectories']):
-            plt.plot(self.subcube[subdir]['bjd']-t0[n], batmanmodels[subdir], 'k-', lw=2)
+            plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], batmanmodels[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2)
         plt.xlabel('Time from Mid-Transit (days)', fontsize=20)
         plt.ylabel('Normalized Flux', fontsize=20)
         plt.title('Full Fit for '+self.wavefile+' angstroms', fontsize=20)
