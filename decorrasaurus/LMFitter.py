@@ -82,10 +82,17 @@ class LMFitter(Talker, Writer):
         def lineareqn(params):
             return model.makemodel(np.array(list(params.valuesdict().values())))
 
+        i = 0
+        #print(self.lcs[i])
+        #print(self.photnoiseest[i])
+        #print(self.binnedok[i])
+        #print(self.photnoiseest[i][self.binnedok[i]])
+
         # weight first residuals by photon noise limit (expected noise); 
         # only include binnedok points in residuals - don't want masked points to determine goodness of fit
         def residuals1(params):
             models = lineareqn(params)
+            #print(models)
             residuals = [((self.lcs[i] - models[i])/self.photnoiseest[i])[self.binnedok[i]] for i in self.rangeofdirectories]
             return np.hstack(residuals)
 

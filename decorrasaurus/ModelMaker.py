@@ -32,9 +32,11 @@ class ModelMaker(Talker):
                 self.polyparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == plabel+str(n))[0][0])
 
             self.sysparaminds.append([])
+            self.sysparamarrays.append([])
             for flabel in self.inputs[subdir]['fitlabels']:
                 self.sysparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == flabel+str(n))[0][0])
-                self.sysparamarrays.append(np.array(self.wavebin[subdir]['compcube'][flabel])) 
+                self.sysparamarrays[s].append(np.array(self.wavebin[subdir]['compcube'][flabel])) 
+            self.sysparamarrays[s] = np.array(self.sysparamarrays[s])
 
         self.ones = np.ones(len(self.wavebin['subdirectories']))
 
@@ -76,6 +78,7 @@ class ModelMaker(Talker):
             self.batmanparams.append(setupbatmanparams)
             self.batmanmodels.append(setupbatmanmodel)
 
+
     def limbdarkconversion(self):
 
         if self.inputs['ldlaw'] == 'sq':
@@ -87,7 +90,7 @@ class ModelMaker(Talker):
         elif self.inputs['ldlaw'] == 'qd':
             def calc_u0u1(v0, v1):
                 u0 = (2./5.)*v0 + (1./5.)*v1
-                u1 = (1./5.)*v1 - (2./5.)*v1
+                u1 = (1./5.)*v0 - (2./5.)*v1
                 return [u0, u1]
 
         return calc_u0u1
@@ -138,7 +141,7 @@ class ModelMaker(Talker):
         # make the model that fits to the data systematics
         polyfuncs = [np.poly1d(params[inds][::-1]) for inds in self.polyparaminds]
         polymodels = [polyfuncs[i](self.timearrays[i]) for i in self.rangeofdirectories]
-        sysmodels = [np.sum([np.multiply(params[self.sysparaminds[i]], self.sysparamarrays[i].T).T], axis=0) for i in self.rangeofdirectories]
+        sysmodels = [np.sum(np.multiply(params[self.sysparaminds[i]], self.sysparamarrays[i].T).T, axis=0) for i in self.rangeofdirectories]
         self.fitmodel = np.sum([polymodels, sysmodels, self.ones], axis=0)
 
         # make the transit models wiht batman

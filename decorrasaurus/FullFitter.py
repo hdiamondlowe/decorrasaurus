@@ -316,8 +316,8 @@ class FullFitter(Talker, Writer):
         fitmodel = {}
         batmanmodel = {}
         for s, subdir in enumerate(self.wavebin['subdirectories']): 
-            fitmodel[subdir] = models.fitmodel[s]
-            batmanmodel[subdir] = models.batmanmodel[s]
+            fitmodel[subdir] = modelobj.fitmodel[s]
+            batmanmodel[subdir] = modelobj.batmanmodel[s]
         self.wavebin['mcfit']['fitmodels'] = fitmodel
         self.wavebin['mcfit']['batmanmodels'] = batmanmodel
         self.wavebin['mcfit']['freeparamnames'] = self.freeparamnames
