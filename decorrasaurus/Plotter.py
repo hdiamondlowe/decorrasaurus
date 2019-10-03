@@ -173,7 +173,7 @@ class Plotter(Talker):
                 plt.plot(self.subcube[n]['bjd']-t0[n], batmanmodels[n], 'k-', lw=2, alpha=0.5)
             plt.xlabel('time from mid-transit [days]', fontsize=20)
             plt.ylabel('normalized flux', fontsize=20)
-            plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
+            plt.title('LMFit for, '+self.wavefile+' angstroms', fontsize=20)
             plt.tight_layout()
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
             plt.clf()

@@ -3,6 +3,7 @@ import emcee
 import dynesty
 from dynesty.dynamicsampler import stopping_function, weight_function
 from dynesty.plotting import _quantile
+from dynesty import utils as dyfunc
 import lmfit
 import sys
 from ldtk import LDPSetCreator, BoxcarFilter
@@ -10,14 +11,17 @@ from emcee.utils import MPIPool
 from .ModelMaker import ModelMaker
 from .CubeReader import CubeReader
 from .Plotter import Plotter
-import multiprocessing
+from multiprocessing import Pool
 from scipy import stats
 import scipy.interpolate as interpolate
+import dill as pickle
 #import emceehelper as mc
+
 
 class FullFitter(Talker, Writer):
 
-    '''this class will marginalize over the provided parameters using an mcmc'''
+    '''this class will marginalize over the provided parameters using an mcmc (emcee) or a dynamic nested sampler (dynesty)'''
+    '''WARNING: mcmc depricated; use dynesty instead'''
 
     def __init__(self, detrender, wavefile):
         ''' initialize the lmfitter'''
@@ -47,6 +51,8 @@ class FullFitter(Talker, Writer):
             elif self.inputs['samplecode'] == 'dynesty': self.runFullFit_dynesty()
 
     def setup(self):
+
+        self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
 
         # get the subdirecotry index of the first subdirectory used in this wavebin
         firstdir = self.wavebin['subdirectories'][0]
@@ -92,17 +98,12 @@ class FullFitter(Talker, Writer):
         for b, name in enumerate(self.freeparamnames):
             self.write('    '+name + '    '+str(self.mcmcbounds[0][b])+'    '+str(self.mcmcbounds[1][b]))
 
-        self.sinds = []
-        self.photnoiseests = []
-        self.binnedoks = []
-        self.lcs = []
-        for s, subdir in enumerate(self.wavebin['subdirectories']):
-            self.sinds.append(np.argwhere(np.array(self.freeparamnames) == 's{}'.format(s))[0][0])
-            self.photnoiseests.append(self.wavebin[subdir]['photnoiseest'])
-            self.binnedoks.append(self.wavebin[subdir]['binnedok'])
-            self.lcs.append(self.wavebin[subdir]['lc'])
-
-        self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
+        # pad the uneven lists so that they can be numpy arrays
+        self.lcs = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']]))
+        self.photnoiseest = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]))
+        self.binnedok = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']])).astype(bool)
+        self.sinds = np.array([np.argwhere(np.array(self.freeparamnames) == 's{}'.format(s))[0][0] for s, subdir in enumerate(self.wavebin['subdirectories'])])
+        self.numpoints = np.array([len(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
 
     def runFullFit_emcee(self):
 
@@ -230,25 +231,13 @@ class FullFitter(Talker, Writer):
     def runFullFit_dynesty(self):
 
         # rescaling uncertainties as a free parameter during the fit (Berta, et al. 2011, references therein)
-        modelobj = ModelMaker(self.inputs, self.wavebin)
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         def lnlike(p):
-            # test what the priors look like on their own
-            #rpind = int(np.where(np.array(self.freeparamnames) == 'rp'+str(0))[0])
-            #logl = -0.5 * ((p[rpind] - 0.05)/0.01)**2
-            #return logl
-
             models = modelobj.makemodel(p)
-            logl = [-len(self.photnoiseests[i][self.binnedoks[i]]) * np.log(p[self.sinds[i]]) - 0.5*(1./(p[self.sinds[i]]**2))*np.sum((((self.lcs[i] - models[i])/self.photnoiseests[i])[self.binnedoks[i]])**2) for i in self.rangeofdirectories]
-            #for subdir in self.wavebin['subdirectories']:
-            #    n = self.inputs[subdir]['n']
-                # p[sind] is an 's' parameter; if the uncertainties do not need to be re-scaled then s = 1
-                # there is a single 's' parameter for each night's fit - helpful if a dataset is far from the photon noise
-            #    sind = np.argwhere(np.array(self.freeparamnames) == 's'+n)[0][0]
-            #    penaltyterm = -len(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) * np.log(p[sind])
-            #    chi2 = (((self.wavebin[subdir]['lc'] - models[subdir])/self.wavebin[subdir]['photnoiseest'])[self.wavebin[subdir]['binnedok']])**2
-            #    logl.append(penaltyterm - 0.5*(1./(p[sind]**2))*np.sum(chi2))
+            # likelihood function; follow Berta+ (2012) for scaling
+            logl = -self.numpoints * np.log(p[self.sinds]) - 0.5*(1./(p[self.sinds]**2))*np.nansum((((self.lcs - models)/self.photnoiseest)*self.binnedok)**2, axis=1)
             return np.sum(logl)
-            
+
         # inverse transform sampling    
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
         v = np.linspace(0, 1, 100000)
@@ -263,7 +252,7 @@ class FullFitter(Talker, Writer):
             x = np.array(p)
             span = self.mcmcbounds[1] - self.mcmcbounds[0]
             x = x*span + self.mcmcbounds[0]
-
+            
             if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
             if x[u0ind] > .9999: x[u0ind] = .9999
             x[u0ind] = ppf_func_u0(x[u0ind])
@@ -277,16 +266,18 @@ class FullFitter(Talker, Writer):
         ndim = len(self.freeparamnames)
 
         self.speak('running dynesty')
-        #self.dsampler = dynhelp.dyn(self.detrender, self.inputs, self.wavebin, self.mcmcbounds, ndim)
 
         if ndim > 25: # use special inputs that will make run more efficient
-            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, bound='multi', sample='slice', update_interval=float(ndim))
+            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, bound='multi', sample='slice')
             self.dsampler.run_nested(nlive_init=int(5*ndim), nlive_batch=int(5*ndim), wt_kwargs={'pfrac': 1.0}) # place 100% of the weight on the posterior, don't sample the evidence
         else: # use defaults
             self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, sample='slice')
             self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
 
-        quantiles = [_quantile(self.dsampler.results['samples'][:,i], [.16, .5, .84], weights=np.exp(self.dsampler.results['logwt'] - self.dsampler.results['logwt'][-1])) for i in range(len(self.freeparamnames))]
+        results = self.dsampler.results
+        samples = results.samples
+        # get the best fit +/- 1sigma uncertainties for each parameter; need to weight by the scaled logwt so that the "burn-in" samples are down-weighted
+        quantiles = [dyfunc.quantile(samps, [.16, .5, .84], weights=np.exp(results['logwt']-results['logwt'][-1])) for samps in samples.T]
         self.mcparams = np.array(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), quantiles))) # had to add list() for python3
 
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
@@ -301,9 +292,9 @@ class FullFitter(Talker, Writer):
         [self.write('     '+self.freeparamnames[i]+'     '+str(self.mcparams[i][0])+'     '+str(self.mcparams[i][1])+'     '+str(self.mcparams[i][2])) for i in range(len(self.freeparamnames))]
 
         #calculate rms from mcfit
-        modelobj = ModelMaker(self.inputs, self.wavebin)
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         models = modelobj.makemodel(self.mcparams[:,0])
-        resid = [(self.lcs[i] - models[i])[self.binnedoks[i]] for i in self.rangeofdirectories]
+        resid = [(self.lcs[i] - models[i])[self.binnedok[i]] for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('mcfit overall RMS: '+str(data_unc))
@@ -313,11 +304,16 @@ class FullFitter(Talker, Writer):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
         self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) for n in range(len(self.wavebin['subdirectories']))])))
 
+        # sort the fit and batman models into their subdirectories; remove the padded values from the ends of each
         fitmodel = {}
         batmanmodel = {}
-        for s, subdir in enumerate(self.wavebin['subdirectories']): 
-            fitmodel[subdir] = modelobj.fitmodel[s]
-            batmanmodel[subdir] = modelobj.batmanmodel[s]
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            if self.detrender.inputs.numberofzeros[s] == 0:
+                fitmodel[subdir] = modelobj.fitmodel[s]
+                batmanmodel[subdir] = modelobj.batmanmodel[s]
+            else:
+                fitmodel[subdir] = modelobj.fitmodel[s][:-self.detrender.inputs.numberofzeros[s]]
+                batmanmodel[subdir] = modelobj.batmanmodel[s][:-self.detrender.inputs.numberofzeros[s]]
         self.wavebin['mcfit']['fitmodels'] = fitmodel
         self.wavebin['mcfit']['batmanmodels'] = batmanmodel
         self.wavebin['mcfit']['freeparamnames'] = self.freeparamnames

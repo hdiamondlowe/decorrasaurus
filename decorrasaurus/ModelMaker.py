@@ -9,33 +9,38 @@ class ModelMaker(Talker):
         ''' initialize the model maker'''
         Talker.__init__(self)
 
-        self.inputs = inputs
+        self.inputs = inputs.inputs
         self.wavebin = wavebin
         self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
 
         # set up the model for the systematic parameters
         # determine the time arrays, systematic parameter arrays, and what indices go into polyparaminds or sysparaminds
-        self.timearrays = []
-        self.sysparamarrays = []
-        self.polyparaminds = []
-        self.sysparaminds = []
+        timearrays = []
+        sysparamlists = []
+        polyparaminds = []
+        sysparaminds = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             n = self.inputs[subdir]['n']
 
             time_range = self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']][-1] - self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']][0]
-            self.timearrays.append((self.wavebin[subdir]['compcube']['bjd']-self.inputs[subdir]['toff'])/time_range)
+            timearrays.append((self.wavebin[subdir]['compcube']['bjd']-self.inputs[subdir]['toff'])/time_range)
             
-            self.polyparaminds.append([])
+            polyparaminds.append([])
             for p, plabel in enumerate(self.inputs[subdir]['polylabels']):
-                self.polyparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == plabel+str(n))[0][0])
+                polyparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == plabel+str(n))[0][0])
 
-            self.sysparaminds.append([])
-            self.sysparamarrays.append([])
+            sysparaminds.append([])
+            sysparamlists.append([])
             for flabel in self.inputs[subdir]['fitlabels']:
-                self.sysparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == flabel+str(n))[0][0])
-                self.sysparamarrays[s].append(np.array(self.wavebin[subdir]['compcube'][flabel])) 
-            self.sysparamarrays[s] = np.array(self.sysparamarrays[s])
+                sysparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == flabel+str(n))[0][0])
+                sysparamlists[s].append(np.array(self.wavebin[subdir]['compcube'][flabel])) 
 
+        # transform everything into a numpy array so we can do numpy math
+        self.timearrays = inputs.equalizeArrays1D(timearrays)
+        self.sysparamarrays = inputs.equalizeArrays2D(sysparamlists).T
+        self.polyparaminds = polyparaminds              # keep as uneven list to ensure that polynomials are correct length
+        self.sysparaminds = inputs.equalizeArrays1D(sysparaminds).astype(int).T
+        
         self.ones = np.ones(len(self.wavebin['subdirectories']))
 
         # set up the model for the transit parameters
@@ -43,8 +48,7 @@ class ModelMaker(Talker):
         self.batmandictionaries = []
         self.batmanupdatenames = []
         self.batmanparaminds = []
-        self.batmanparams = []
-        self.batmanmodels = []
+        times = []
 
         firstdir = self.wavebin['subdirectories'][0]
         firstn = self.inputs[firstdir]['n']
@@ -71,11 +75,16 @@ class ModelMaker(Talker):
                     self.batmanparaminds[s].append(paramind)
 
             # make times such that time of mid-transit should be at 0
-            times = self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff']
-            setupbatmanparams, setupbatmanmodel = self.setup_batman_model(self.batmandictionaries[s], times)
+            times.append(self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])
+
+        times = inputs.equalizeArrays1D(times, padwith=1)
+        self.batmanparams = []
+        self.batmanmodels = []
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+
+            setupbatmanparams, setupbatmanmodel = self.setup_batman_model(self.batmandictionaries[s], times[s])
             self.batmanparams.append(setupbatmanparams)
             self.batmanmodels.append(setupbatmanmodel)
-
 
     def limbdarkconversion(self):
 
@@ -105,12 +114,9 @@ class ModelMaker(Talker):
         batmanparams.w = dictionary['omega']                        #longitude of periastron (in degrees)
         if self.inputs['ldlaw'] == 'qd': batmanparams.limb_dark = "quadratic"        #limb darkening model
         elif self.inputs['ldlaw'] == 'sq': batmanparams.limb_dark = "squareroot"        #limb darkening model
-        
         batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])                   #limb darkening coefficients
-        #params.fac = 1e-3
 
         batmanmodel = batman.TransitModel(batmanparams, times)    #initializes model
-        #model = batman.TransitModel(params, self.times, fac=self.batmanfac)    #initializes model
 
         # return the model and parameter structures so we can update them later to get the model light curves we want
         return batmanparams, batmanmodel
@@ -127,8 +133,7 @@ class ModelMaker(Talker):
         batmanparams.ecc = dictionary['ecc']                 #eccentricity
         batmanparams.w = dictionary['omega']                 #longitude of periastron (in degrees)
         
-        batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])                    #limb darkening coefficients
-        #params.fac = 1e-3
+        batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])   #limb darkening coefficients
 
         # now return a light curve
         return np.array(batmanmodel.light_curve(batmanparams))
@@ -137,14 +142,16 @@ class ModelMaker(Talker):
     def makemodel(self, params):
 
         # make the model that fits to the data systematics
+        # this involves making a 1d polynomial for each data set and applying it to the time array for each data set
         polyfuncs = [np.poly1d(params[inds][::-1]) for inds in self.polyparaminds]
         polymodels = [polyfuncs[i](self.timearrays[i]) for i in self.rangeofdirectories]
-        sysmodels = [np.sum(np.multiply(params[self.sysparaminds[i]], self.sysparamarrays[i].T).T, axis=0) for i in self.rangeofdirectories]
-        self.fitmodel = np.sum([polymodels, sysmodels, self.ones], axis=0)
+
+        sysmodels = np.sum(np.multiply(params[self.sysparaminds], self.sysparamarrays), axis=1)
+        self.fitmodel = np.sum([np.array(polymodels).T, sysmodels, self.ones]).T
 
         # make the transit models wiht batman
         self.batmanmodel = [self.update_batman_model(self.batmanparams[i], self.batmanmodels[i], self.batmandictionaries[i], self.batmanupdatenames[i], params[self.batmanparaminds[i]]) for i in self.rangeofdirectories]
 
-        return [self.fitmodel[i]*self.batmanmodel[i] for i in self.rangeofdirectories]
+        return np.multiply(self.fitmodel, self.batmanmodel)
 
 
