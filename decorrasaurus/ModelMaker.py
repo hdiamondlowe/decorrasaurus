@@ -40,7 +40,7 @@ class ModelMaker(Talker):
         self.sysparamarrays = inputs.equalizeArrays2D(sysparamlists).T
         self.polyparaminds = polyparaminds              # keep as uneven list to ensure that polynomials are correct length
         self.sysparaminds = inputs.equalizeArrays1D(sysparaminds).astype(int).T
-        
+
         self.ones = np.ones(len(self.wavebin['subdirectories']))
 
         # set up the model for the transit parameters
@@ -143,8 +143,7 @@ class ModelMaker(Talker):
 
         # make the model that fits to the data systematics
         # this involves making a 1d polynomial for each data set and applying it to the time array for each data set
-        polyfuncs = [np.poly1d(params[inds][::-1]) for inds in self.polyparaminds]
-        polymodels = [polyfuncs[i](self.timearrays[i]) for i in self.rangeofdirectories]
+        polymodels = [np.poly1d(params[self.polyparaminds[i]][::-1])(self.timearrays[i]) for i in self.rangeofdirectories]
 
         sysmodels = np.sum(np.multiply(params[self.sysparaminds], self.sysparamarrays), axis=1)
         self.fitmodel = np.sum([np.array(polymodels).T, sysmodels, self.ones]).T

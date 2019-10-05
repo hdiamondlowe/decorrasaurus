@@ -54,7 +54,7 @@ class Detrender(Talker, Writer):
             self.lmfit = LMFitter(self, wavefile)
 
         if self.inputs.inputs['fullsample']:
-            for wavefile in self.lcs.allwavefiles:
+            for wavefile in self.lcs.allwavefiles[16:20]:
                 self.mcfit = FullFitter(self, wavefile)
 
 
