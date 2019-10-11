@@ -201,5 +201,28 @@ class Inputs(Talker):
         inputs['specstretchpath'] = dictionary['specstretchpath']
         
         self.inputs[self.subdir] = inputs
-                    
+
+    def equalizeArrays1D(self, unevenlist, padwith=0):
+        # should work for nested arrays up to 2D
+
+        maxarraycols = np.max([len(i) for i in unevenlist])
+        self.numberofzeros = maxarraycols - [len(i) for i in unevenlist] 
+
+        newarray = [np.append(array, np.zeros(self.numberofzeros[i])+padwith) for i, array in enumerate(unevenlist)] 
+        numpyarray = np.hstack(newarray).reshape(len(unevenlist), maxarraycols) 
+
+        return numpyarray
+
+    def equalizeArrays2D(self, unevenlist, padwith=0):
+
+        self.maxarraycols = np.max([len(i) for i in unevenlist])
+        self.maxarrayrows = np.max(np.hstack([[len(j) for j in unevensublist] for unevensublist in unevenlist]))
+
+        zeroarray = np.zeros((len(unevenlist), self.maxarraycols, self.maxarrayrows)) + padwith
+        for i in range(len(unevenlist)):
+            for j in range(len(unevenlist[i])):
+                for k in range(len(unevenlist[i][j])):
+                    zeroarray[i][j][k] = unevenlist[i][j][k]
+
+        return zeroarray
 

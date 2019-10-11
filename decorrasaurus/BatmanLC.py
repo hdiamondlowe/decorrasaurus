@@ -4,7 +4,6 @@
 
 import batman
 import numpy as np
-import astrotools.orbitparams as OP
 
 class BatmanLC(object):
 

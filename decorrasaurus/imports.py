@@ -9,6 +9,7 @@ Writer = craftroom.Writer.Writer
 
 import astropy.io.fits, astropy.io.ascii, astropy.time
 from astropy import time, coordinates as coord, units as u
+from collections import OrderedDict
 
 import matplotlib.pyplot as plt, numpy as np, scipy
 
