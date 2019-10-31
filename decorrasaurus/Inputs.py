@@ -94,6 +94,8 @@ class Inputs(Talker):
                 return True
             elif s == 'False':
                 return False
+            elif s == 'None':
+                return None
             else:
                 try: return float(s)
                 except(ValueError): 
@@ -102,13 +104,7 @@ class Inputs(Talker):
 
         inputs = {}
         inputs['n'] = str(self.n)
-
         inputs['nightname']  = dictionary['nightname']
-        inputs['against']    = dictionary['against']
-        inputs['fitlabels']  = dictionary['fitlabels']
-        if type(inputs['fitlabels']) == str: inputs['fitlabels'] = [dictionary['fitlabels']]
-        inputs['polyfit']    = int(dictionary['polyfit'])
-        inputs['polylabels'] = [string.ascii_uppercase[x] for x in range(inputs['polyfit'])]
 
         if self.n == 0:
 
@@ -135,29 +131,73 @@ class Inputs(Talker):
         inputs['epochnum'] = int(dictionary['epochnum'])
         inputs['toff'] = self.inputs['T0'] + self.inputs['P']*inputs['epochnum']
 
+        if self.n == 0:
+            self.inputs['sysmodel'] = dictionary['sysmodel']
+
+        if self.inputs['sysmodel'] == 'linear':
+            inputs['fitlabels']  = dictionary['fitlabels']
+            if type(inputs['fitlabels']) == str: inputs['fitlabels'] = [dictionary['fitlabels']]
+            inputs['polyfit']    = int(dictionary['polyfit'])
+            inputs['polylabels'] = [string.ascii_uppercase[x] for x in range(inputs['polyfit'])]
+            inputs['fitparams']  = [1 for f in inputs['fitlabels']]
+            inputs['polyparams'] = [1 for p in inputs['polylabels']]
+
+        elif self.inputs['sysmodel'] == 'GP':
+            inputs['kernelname']  = dictionary['kernelname']
+            inputs['kernelparams'] = [str_to_bool(i) for i in dictionary['kernelparams']]
+            inputs['kernelbounds'] = [[str_to_bool(i) for i in dictionary['kernelboundslo']], [str_to_bool(i) for i in dictionary['kernelboundshi']]]
+
+        else: 
+            self.speak('ERROR! Need to define a decorrelation model for the systematics, either linear or GP')
+            return
+
         inputs['tranlabels']      = dictionary['tranlabels']
         inputs['tranparams']      = [str_to_bool(i) for i in dictionary['tranparams']]
         inputs['tranbounds']      = [[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]
         inputs['wavelength_lims'] = [float(i) for i in dictionary['wavelength_lims']]
         assert(len(inputs['tranbounds'][0]) == len(inputs['tranlabels']) and len(inputs['tranbounds'][1]) == len(inputs['tranlabels'])), 'There is something wrong with the transit parameter bounds'
-
-        inputs['fitparams']  = [1 for f in inputs['fitlabels']]
-        inputs['polyparams'] = [1 for p in inputs['polylabels']]
+        inputs['against']         = dictionary['against']
 
         inputs['freeparambounds'] = [[], []]
         inputs['freeparamnames'] = []
         inputs['freeparamvalues'] = []
 
-        for p, plabel in enumerate(inputs['polylabels']):
-            inputs['freeparambounds'][0].append(True)
-            inputs['freeparambounds'][1].append(True)
-            inputs['freeparamnames'].append(plabel+str(self.n))
-            inputs['freeparamvalues'].append(inputs['polyparams'][p])
-        for f, flabel in enumerate(inputs['fitlabels']):
-            inputs['freeparambounds'][0].append(True)
-            inputs['freeparambounds'][1].append(True)
-            inputs['freeparamnames'].append(flabel+str(self.n))
-            inputs['freeparamvalues'].append(inputs['fitparams'][f])
+        if self.inputs['sysmodel'] == 'linear':
+            for p, plabel in enumerate(inputs['polylabels']):
+                inputs['freeparambounds'][0].append(True)
+                inputs['freeparambounds'][1].append(True)
+                inputs['freeparamnames'].append(plabel+str(self.n))
+                inputs['freeparamvalues'].append(inputs['polyparams'][p])
+            for f, flabel in enumerate(inputs['fitlabels']):
+                inputs['freeparambounds'][0].append(True)
+                inputs['freeparambounds'][1].append(True)
+                inputs['freeparamnames'].append(flabel+str(self.n))
+                inputs['freeparamvalues'].append(inputs['fitparams'][f])
+
+        elif self.inputs['sysmodel'] == 'GP':
+            if inputs['kernelname'] == 'RealTerm':
+                assert len(inputs['kernelparams']) == 2 and len(inputs['kernelbounds'][0]) == 2 and len(inputs['kernelbounds'][1]) == 2, 'There is something wrong with the number of kernel parameters given for that kernel'
+                inputs['kernellabels'] = ['log_a', 'log_c']
+            elif inputs['kernelname'] == 'ComplexTerm':
+                assert len(inputs['kernelparams']) == 4 and len(inputs['kernelbounds'][0]) == 4 and len(inputs['kernelbounds'][1]) == 4, 'There is something wrong with the number of kernel parameters given for that kernel'
+                inputs['kernellabels'] = ['log_a', 'log_b', 'log_c', 'log_d']
+            elif inputs['kernelname'] == 'SHOTerm':
+                assert len(inputs['kernelparams']) == 3 and len(inputs['kernelbounds'][0]) == 3 and len(inputs['kernelbounds'][1]) == 3, 'There is something wrong with the number of kernel parameters given for that kernel'
+                inputs['kernellabels'] = ['log_S0', 'log_Q', 'log_omega0']
+            elif inputs['kernelname'] == 'Matern32Term':
+                assert len(inputs['kernelparams']) == 2 and len(inputs['kernelbounds'][0]) == 2 and len(inputs['kernelbounds'][1]) == 2, 'There is something wrong with the number of kernel parameters given for that kernel'
+                inputs['kernellabels'] = ['log_sigma', 'log_rho']
+            else:
+                self.speak('ERROR! If you want to use a GP, you must pick a valid mode: RealTerm, ComplexTerm, SHOTerm, or Matern32Term')
+                return
+
+            for k, klabel in enumerate(inputs['kernellabels']):
+                inputs['freeparambounds'][0].append(inputs['kernelbounds'][0][k])
+                inputs['freeparambounds'][1].append(inputs['kernelbounds'][1][k])
+                inputs['freeparamnames'].append(klabel+str(self.n))
+                inputs['freeparamvalues'].append(inputs['kernelparams'][k])                
+                
+
         for t, tlabel in enumerate(inputs['tranlabels']):
             if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue
             inputs['freeparambounds'][0].append(inputs['tranbounds'][0][t])

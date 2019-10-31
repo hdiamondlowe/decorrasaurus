@@ -7,14 +7,12 @@ from dynesty import utils as dyfunc
 import lmfit
 import sys
 from ldtk import LDPSetCreator, BoxcarFilter
-from emcee.utils import MPIPool
 from .ModelMaker import ModelMaker
 from .CubeReader import CubeReader
 from .Plotter import Plotter
 from multiprocessing import Pool
 from scipy import stats
 import scipy.interpolate as interpolate
-import dill as pickle
 #import emceehelper as mc
 
 
@@ -35,7 +33,7 @@ class FullFitter(Talker, Writer):
         
         Writer.__init__(self, self.savewave+'.txt')
 
-        self.wavebin = np.load(self.savewave+'.npy')[()]
+        self.wavebin = np.load(self.savewave+'.npy', allow_pickle=True)[()]
         if self.wavebin['mcfitdone']:
             self.speak('mcfit already exists for wavelength bin {0}'.format(self.wavefile))
             if self.inputs['samplecode'] == 'emcee':
@@ -236,6 +234,7 @@ class FullFitter(Talker, Writer):
             models = modelobj.makemodel(p)
             # likelihood function; follow Berta+ (2012) for scaling
             logl = -self.numpoints * np.log(p[self.sinds]) - 0.5*(1./(p[self.sinds]**2))*np.nansum((((self.lcs - models)/self.photnoiseest)*self.binnedok)**2, axis=1)
+            print(np.sum(logl))
             return np.sum(logl)
 
         # inverse transform sampling    
@@ -254,12 +253,12 @@ class FullFitter(Talker, Writer):
             x = x*span + self.mcmcbounds[0]
             
             if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            if x[u0ind] > .9999: x[u0ind] = .9999
-            x[u0ind] = ppf_func_u0(x[u0ind])
+            elif x[u0ind] > .9999: x[u0ind] = .9999
+            else: x[u0ind] = ppf_func_u0(x[u0ind])
 
             if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            if x[u1ind] > .9999: x[u1ind] = .9999
-            x[u1ind] = ppf_func_u1(x[u1ind])
+            elif x[u1ind] > .9999: x[u1ind] = .9999
+            else: x[u1ind] = ppf_func_u1(x[u1ind])
 
             return x
 

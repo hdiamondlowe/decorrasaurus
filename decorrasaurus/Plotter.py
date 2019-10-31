@@ -64,22 +64,23 @@ class Plotter(Talker):
                 plt.clf()
                 plt.close()
 
-        self.speak('plotting fit parameters')
-        for subdir in self.wavebin['subdirectories']:
-            for f in self.inputs[subdir]['fitlabels']:
-                plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['compcube'][f][self.wavebin[subdir]['binnedok']], alpha=0.7, label=f+str(self.inputs[subdir]['n']))
-            polymodel = 0
-            for p in range(self.inputs[subdir]['polyfit']):
-                polymodel += ((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])**p           
-            if self.inputs[subdir]['polyfit'] > 0: plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], polymodel, label='polyfit deg'+str(self.inputs[subdir]['polyfit']))
-            plt.legend(loc='best')
-            plt.xlabel('BJD')
-            plt.ylabel('Parameter')
-            plt.title(subdir+', '+self.wavefile+', decorrelation parameters')
-            plt.tight_layout()
-            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_decorrelationparams_'+subdir+'.png')
-            plt.clf()
-            plt.close()
+        if self.inputs['sysmodel'] == 'linear':
+            self.speak('plotting fit parameters')
+            for subdir in self.wavebin['subdirectories']:
+                for f in self.inputs[subdir]['fitlabels']:
+                    plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['compcube'][f][self.wavebin[subdir]['binnedok']], alpha=0.7, label=f+str(self.inputs[subdir]['n']))
+                polymodel = 0
+                for p in range(self.inputs[subdir]['polyfit']):
+                    polymodel += ((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])**p           
+                if self.inputs[subdir]['polyfit'] > 0: plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], polymodel, label='polyfit deg'+str(self.inputs[subdir]['polyfit']))
+                plt.legend(loc='best')
+                plt.xlabel('BJD')
+                plt.ylabel('Parameter')
+                plt.title(subdir+', '+self.wavefile+', decorrelation parameters')
+                plt.tight_layout()
+                plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_decorrelationparams_'+subdir+'.png')
+                plt.clf()
+                plt.close()
         
     def lmplots(self, wavebin, linfits):
 

@@ -1,7 +1,6 @@
 from .imports import *
-import scipy
+from scipy.optimize import minimize
 import lmfit
-from lmfit import Minimizer
 #import os
 from ldtk import LDPSetCreator, BoxcarFilter
 from .ModelMaker import ModelMaker
@@ -23,7 +22,7 @@ class LMFitter(Talker, Writer):
         
         Writer.__init__(self, self.savewave+'.txt')
 
-        self.wavebin = np.load(self.savewave+'.npy')[()]
+        self.wavebin = np.load(self.savewave+'.npy', allow_pickle=True)[()]
         subdirs = self.wavebin.keys()
 
         if self.wavebin['lmfitdone']:
@@ -32,7 +31,10 @@ class LMFitter(Talker, Writer):
         else: 
             self.speak('running lmfit for wavelength bin {0}'.format(self.wavefile))
             self.setup()
-            self.runLMFit()
+            if self.inputs['sysmodel'] == 'linear':
+                self.runLMFitLinear()
+            elif self.inputs['sysmodel'] == 'GP':
+                self.runLMFitGP()
 
     def setup(self):
 
@@ -59,15 +61,21 @@ class LMFitter(Talker, Writer):
 
         self.wavebin['freeparamnames'] = self.freeparamnames
 
-        # pad all of the arrays with zeros so that we can do numpy math and vectorize everything
-        # it would be neater if all of this was in some other class but whatever, good enough for now
-        self.lcs = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']]))
-        self.photnoiseest = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]))
-        self.binnedok = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']])).astype(bool)
+        if self.inputs['sysmodel'] == 'linear':
+            # pad all of the arrays with zeros so that we can do numpy math and vectorize everything
+            # it would be neater if all of this was in some other class but whatever, good enough for now
+            self.lcs = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']]))
+            self.photnoiseest = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]))
+            self.binnedok = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']])).astype(bool)
+
+        elif self.inputs['sysmodel'] == 'GP':
+            self.lcs = [self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']]
+            self.photnoiseest = [self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]
+            self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
 
         self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
 
-    def runLMFit(self):
+    def runLMFitLinear(self):
 
         self.speak('running first lmfit scaling by photon noise limits')#, making output txt file')
 
@@ -82,7 +90,7 @@ class LMFitter(Talker, Writer):
 
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         def lineareqn(params):
-            return modelobj.makemodel(np.array(list(params.valuesdict().values())))
+            return modelobj.makemodelLinear(np.array(list(params.valuesdict().values())))
 
         # weight first residuals by photon noise limit (expected noise); 
         # only include binnedok points in residuals - don't want masked points to determine goodness of fit
@@ -105,7 +113,7 @@ class LMFitter(Talker, Writer):
  
         # median absolute deviation sigma clipping to specified sigma value from inputs
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        models = modelobj.makemodel(np.array(linfit1paramvals))
+        models = modelobj.makemodelLinear(np.array(linfit1paramvals))
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             resid = (self.lcs[s] - models[s])[self.binnedok[s]] # don't include masked points in residuals
 
@@ -162,7 +170,7 @@ class LMFitter(Talker, Writer):
             lmfitparams[name].set(min=minbound, max=maxbound)
 
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        models = modelobj.makemodel(np.array(linfit2paramvals))
+        models = modelobj.makemodelLinear(np.array(linfit2paramvals))
         data_uncs2 = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             resid = (self.lcs[s] - models[s])[self.binnedok[s]]
@@ -191,7 +199,7 @@ class LMFitter(Talker, Writer):
             self.write('lmfit transit midpoint for {0}: {1}'.format(subdir, self.inputs[subdir]['t0']))
 
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        models = modelobj.makemodel(np.array(linfit3paramvals))
+        models = modelobj.makemodelLinear(np.array(linfit3paramvals))
 
         resid = [(self.lcs[i] - models[i])[self.binnedok[i]] for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
@@ -241,7 +249,174 @@ class LMFitter(Talker, Writer):
 
         if self.inputs['dividewhite'] and self.inputs['binlen']=='all':
             # save the transit model from the white light curve fit
-            self.dividewhite = np.load(self.inputs['directoryname']+'dividewhite.npy')[()]
+            self.dividewhite = np.load(self.inputs['directoryname']+'dividewhite.npy', allow_pickle=True)[()]
+            self.speak('saving Twhite for later use by divide white routine')
+            self.dividewhite['Twhite'] = modelobj.batmanmodel
+            np.save(self.inputs['directoryname']+'dividewhite.npy', self.dividewhite)
+
+    def runLMFitGP(self):
+
+        self.speak('running first lmfit scaling by photon noise limits')#, making output txt file')
+
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
+        gps = modelobj.makemodelGP(self.freeparamvalues)
+
+        def neg_log_like(p):
+            [gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
+            #print(p)
+            return np.sum([-gps[i].log_likelihood(self.lcs[i]) for i in self.rangeofdirectories])
+
+        fit_kws={'epsfcn':1e-5}  # set the stepsize to something small but reasonable; withough this lmfit may have trouble perturbing values
+            #, 'full_output':True, 'xtol':1e-5, 'ftol':1e-5, 'gtol':1e-5}
+        self.linfit1 = lmfit.minimize(fcn=residuals1, params=lmfitparams, method='leastsq', **fit_kws)
+        linfit1paramvals = list(self.linfit1.params.valuesdict().values())
+        linfit1uncs = np.sqrt(np.diagonal(self.linfit1.covar))
+        self.write('1st lm params:')
+        [self.write('    '+self.freeparamnames[i]+'    '+str(linfit1paramvals[i])+'  +/-  '+str(linfit1uncs[i])) for i in range(len(self.freeparamnames))]
+
+        ######### do a second fit with priors, now that you know what the initial scatter is ########
+        
+        self.speak('running second lmfit after clipping >{0} sigma points'.format(self.inputs['sigclip']))
+ 
+        # median absolute deviation sigma clipping to specified sigma value from inputs
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
+        models = modelobj.makemodelGP(np.array(linfit1paramvals))
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            resid = (self.lcs[s] - models[s])[self.binnedok[s]] # don't include masked points in residuals
+
+            # median absolute deviation
+            mad = np.median(abs(resid - np.median(resid)))
+            scale = 1.4826
+            data_unc = scale*mad               # scale x median absolute deviation
+            
+            # find indices that do not meet clipping requirement
+            clippoint = (resid > (self.inputs['sigclip']*data_unc)) | (resid < (-self.inputs['sigclip']*data_unc)) # boolean array; true if point does not meet clipping requirements
+            #print('clippoint', clippoint)
+            
+            # remake 'binnedok'
+            goodinds = np.where(self.wavebin[subdir]['binnedok'])[0] # indices that were fed into the model
+            clipinds = goodinds[clippoint] # just the indices that should be clipped
+            self.wavebin[subdir]['binnedok'][clipinds] = False
+
+            # save new 'binnedok' to wavebin to be used later
+            self.write('clipped points for {0}: {1}'.format(subdir, clipinds))
+            np.save(self.savewave, self.wavebin)
+        self.binnedok = self.detrender.inputs.equalizeArrays1D(np.array([self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']])).astype(bool)
+
+        lmfitparams = lmfit.Parameters()
+        for n, name in enumerate(self.freeparamnames):
+            lmfitparams[name] = lmfit.Parameter(value=self.freeparamvalues[n])
+            if self.freeparambounds[0][n] == True: minbound = None
+            else: minbound = self.freeparambounds[0][n]
+            if self.freeparambounds[1][n] == True: maxbound = None
+            else: maxbound = self.freeparambounds[1][n]
+            lmfitparams[name].set(min=minbound, max=maxbound)
+
+        # weight by photon noise limit (expected noise); only include binnedok points in residuals - don't want masked points to determine goodness of fit
+        def residuals2(params):
+            models = lineareqn(params)
+            return ((self.lcs - models)/self.photnoiseest)[self.binnedok]
+
+        self.linfit2 = lmfit.minimize(fcn=residuals2, params=lmfitparams, method='leastsq', **fit_kws)
+        linfit2paramvals = list(self.linfit2.params.valuesdict().values())
+        linfit2uncs = np.sqrt(np.diagonal(self.linfit2.covar))
+        self.write('2nd lm params:')
+        [self.write('    '+self.freeparamnames[i]+'    '+str(linfit2paramvals[i])+'  +/-  '+str(linfit2uncs[i])) for i in range(len(self.freeparamnames))]
+
+        ######### do a third fit, now with calculated uncertainties ########
+        
+        self.speak('running third lmfit after calculating undertainties from the data'.format(self.inputs['sigclip']))
+ 
+        lmfitparams = lmfit.Parameters()
+        for n, name in enumerate(self.freeparamnames):
+            lmfitparams[name] = lmfit.Parameter(value=self.freeparamvalues[n])
+            if self.freeparambounds[0][n] == True: minbound = None
+            else: minbound = self.freeparambounds[0][n]
+            if self.freeparambounds[1][n] == True: maxbound = None
+            else: maxbound = self.freeparambounds[1][n]
+            lmfitparams[name].set(min=minbound, max=maxbound)
+
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
+        models = modelobj.makemodelGP(np.array(linfit2paramvals))
+        data_uncs2 = []
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            resid = (self.lcs[s] - models[s])[self.binnedok[s]]
+            data_unc = np.std(resid)
+            data_uncs2.append(data_unc)
+        self.write('lmfit2 data uncs: {0}'.format(data_uncs2))
+        data_uncs2 = np.array(data_uncs2)
+
+        # weight by calculated uncertainty; only include binnedok points in residuals - don't want masked points to determine goodness of fit
+        # this will make chi^2 equal to the number of data points; compare model runs using AIC and BIC built into lmfit 
+        def residuals3(params):
+            models = lineareqn(params)
+            return ((self.lcs - models).T/data_uncs2).T[self.binnedok]
+
+        self.linfit3 = lmfit.minimize(fcn=residuals3, params=lmfitparams, method='leastsq', **fit_kws)
+        linfit3paramvals = list(self.linfit3.params.valuesdict().values())
+        linfit3uncs = np.sqrt(np.diagonal(self.linfit3.covar))
+        self.write('3rd lm params:')
+        [self.write('    '+self.freeparamnames[i]+'    '+str(linfit3paramvals[i])+'  +/-  '+str(linfit3uncs[i])) for i in range(len(self.freeparamnames))]
+
+        for subdir in self.wavebin['subdirectories']:
+            n = str(self.inputs[subdir]['n'])
+            if 'dt'+n in self.linfit3.params.keys():
+                self.inputs[subdir]['t0'] = self.linfit3.params['dt'+n] + self.inputs[subdir]['toff']
+                self.speak('lmfit reseting t0 parameter for {0}, transit midpoint = {1}'.format(subdir, self.inputs[subdir]['t0']))
+            self.write('lmfit transit midpoint for {0}: {1}'.format(subdir, self.inputs[subdir]['t0']))
+
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
+        models = modelobj.makemodelGP(np.array(linfit3paramvals))
+
+        resid = [(self.lcs[i] - models[i])[self.binnedok[i]] for i in self.rangeofdirectories]
+        allresid = np.hstack(resid)
+        data_unc = np.std(allresid)
+        self.write('lmfit overall RMS: {0}'.format(data_unc))  # this is the same as the rms!
+
+        # how many times the expected noise is the rms?
+        for n, subdir in enumerate(self.wavebin['subdirectories']):
+            self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
+
+        # make BIC,AIC calculations
+        for subdir in self.wavebin['subdirectories']:
+            # use linfit2 where uncertainty was taken from photon noise estimate (does not vary with fit)
+            self.write('Model statistics for {0}: BIC = {1}, AIC = {2}'.format(subdir, self.linfit2.bic, self.linfit2.aic))
+
+        self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
+        self.wavebin['lmfit'] = {}
+        self.wavebin['lmfit']['freeparamnames']  = self.freeparamnames
+        self.wavebin['lmfit']['freeparamvalues'] = self.freeparamvalues
+        self.wavebin['lmfit']['freeparambounds'] = self.freeparambounds
+        self.wavebin['lmfit']['values'] = linfit3paramvals
+        try: self.wavebin['lmfit']['uncs'] = np.sqrt(np.diagonal(self.linfit3.covar))
+        except(ValueError):
+            self.speak('the linear fit returned no uncertainties, consider changing tranbounds values')
+            return
+        if not np.all(np.isfinite(np.array(self.wavebin['lmfit']['uncs']))): 
+            self.speak('lmfit error: there were non-finite uncertainties')
+            return
+        fitmodel = {}
+        batmanmodel = {}
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            if self.detrender.inputs.numberofzeros[s] == 0:
+                fitmodel[subdir] = modelobj.fitmodel[s]
+                batmanmodel[subdir] = modelobj.batmanmodel[s]
+            else:
+                fitmodel[subdir] = modelobj.fitmodel[s][:-self.detrender.inputs.numberofzeros[s]]
+                batmanmodel[subdir] = modelobj.batmanmodel[s][:-self.detrender.inputs.numberofzeros[s]]
+        self.wavebin['lmfit']['fitmodels'] = fitmodel
+        self.wavebin['lmfit']['batmanmodels'] = batmanmodel
+        self.wavebin['lmfitdone'] = True
+        np.save(self.savewave, self.wavebin)
+
+        plot = Plotter(self.inputs, self.cube.subcube)
+        plot.lmplots(self.wavebin, [self.linfit1, self.linfit2, self.linfit3])
+
+        self.speak('done with lmfit for wavelength bin {0}'.format(self.wavefile))
+
+        if self.inputs['dividewhite'] and self.inputs['binlen']=='all':
+            # save the transit model from the white light curve fit
+            self.dividewhite = np.load(self.inputs['directoryname']+'dividewhite.npy', allow_pickle=True)[()]
             self.speak('saving Twhite for later use by divide white routine')
             self.dividewhite['Twhite'] = modelobj.batmanmodel
             np.save(self.inputs['directoryname']+'dividewhite.npy', self.dividewhite)

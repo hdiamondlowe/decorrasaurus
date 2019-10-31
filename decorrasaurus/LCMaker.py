@@ -123,7 +123,10 @@ class LCMaker(Talker, Writer):
                         self.write('    photon noise limits:')
                         self.write('        target               comparison           T/C')
                         self.write('        '+str(np.mean(sigmaT))+'    '+str(np.mean(sigmaC))+'    '+str(np.mean(sigmaF)))
-                        self.write('    fit labels:  '+str(self.inputs[subdir]['fitlabels']))
+                        if self.inputs['sysmodel'] == 'linear':
+                            self.write('    fit labels:  '+str(self.inputs[subdir]['fitlabels']))
+                        elif self.inputs['sysmodel'] == 'GP':
+                            self.write('    fit labels:  '+str(self.inputs[subdir]['kernellabels']))
                         self.write('    tran labels: '+str(self.inputs[subdir]['tranlabels']))
                         self.write('    tran params: '+str(self.inputs[subdir]['tranparams']))
                         self.write('    tran bounds: '+str(self.inputs[subdir]['tranbounds'][0])+'\n                 '+str(self.inputs[subdir]['tranbounds'][1]))
@@ -136,16 +139,6 @@ class LCMaker(Talker, Writer):
                         raw_counts_targ = raw_counts_targ/np.median(raw_counts_targ)
                         raw_counts_comps = np.sum(np.sum([self.subcube[subdir]['raw_counts'][c] * bininds for c in comparisons], 0), 1)
                         raw_counts_comps = raw_counts_comps/np.median(raw_counts_comps)
-
-                        # make list of lightcurves and compcubes used for detrending for each night in subdirectories
-                        #if self.n == 0: 
-                        #    bin['lc'] = [raw_counts_targ/raw_counts_comps]
-                        #    bin['raw_counts_targ'] = [raw_counts_targ]
-                        #    bin['compcube'] = [self.cube.makeCompCube(bininds, self.n)]
-                        #else: 
-                        #    bin['lc'].append(raw_counts_targ/raw_counts_comps)
-                        #    bin['raw_counts_targ'].append(raw_counts_targ)
-                        #    bin['compcube'].append(self.cube.makeCompCube(bininds, self.n))
 
                         if self.inputs['dividewhite'] and self.inputs['binlen']=='all':
                             # save the comparison star white light curves
