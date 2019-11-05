@@ -46,7 +46,7 @@ class RunReader(Talker, Writer):
         self.inputs = Inputs(self.subdirectories, self.rundirectory)
         self.inputs = self.inputs.inputs
 
-        self.subcube = np.load(self.rundirectory+'subcube.npy')[()]
+        self.subcube = np.load(self.rundirectory+'subcube.npy', allow_pickle=True)[()]
 
 
     def readrun(self):
@@ -78,7 +78,7 @@ class RunReader(Talker, Writer):
 
         for wfile in self.results['allwavefiles']:
             # access the information for a single wavelength bin
-            wavebin = np.load(self.rundirectory+wfile+'.npy')[()]
+            wavebin = np.load(self.rundirectory+wfile+'.npy', allow_pickle=True)[()]
 
             if wavebin['mcfitdone']: fit = 'mcfit'
             elif wavebin['lmfitdone']: fit = 'lmfit'
