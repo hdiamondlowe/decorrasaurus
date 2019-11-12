@@ -138,7 +138,7 @@ class Inputs(Talker):
             inputs['fitlabels']  = dictionary['fitlabels']
             if type(inputs['fitlabels']) == str: inputs['fitlabels'] = [dictionary['fitlabels']]
             inputs['polyfit']    = int(dictionary['polyfit'])
-            inputs['polylabels'] = [string.ascii_uppercase[x] for x in range(inputs['polyfit'])]
+            inputs['polylabels'] = ['P{0}coeff'.format(x) for x in range(inputs['polyfit'])]
             inputs['fitparams']  = [1 for f in inputs['fitlabels']]
             inputs['polyparams'] = [1 for p in inputs['polylabels']]
 

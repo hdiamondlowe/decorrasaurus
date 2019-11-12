@@ -445,25 +445,25 @@ class LMFitter(Talker, Writer):
             return
         self.write('limb darkening params: '+str(u[0][0])+' +/- '+str(u_unc[0][0])+'    '+str(u[0][1])+' +/- '+str(u_unc[0][1]))
 
-        # re-parameterize the limb darkening parameters 
+        # re-parameterize the limb darkening parameters according to Kipping+ (2013)
         if self.inputs['ldlaw'] == 'sq':
-            self.v0_array = u0_array/3. + u1_array/5.
-            self.v1_array = u0_array/5. - u1_array/3.
+            self.q0_array = (u0_array + u1_array)**2
+            self.q1_array = u1_array/(2*(u0_array + u1_array))
         elif self.inputs['ldlaw'] == 'qd':
-            self.v0_array = 2*u0_array + u1_array
-            self.v1_array = u0_array - 2*u1_array
-        self.v0, self.v1 = np.mean(self.v0_array), np.mean(self.v1_array)
-        self.v0_unc, self.v1_unc = np.std(self.v0_array), np.std(self.v1_array)
-        self.write('re-parameterized limb darkening params: '+str(self.v0)+' +/- '+str(self.v0_unc)+'    '+str(self.v1)+' +/- '+str(self.v1_unc))
+            self.q0_array = (u0_array + u1_array)**2
+            self.q1_array = u0_array/(2*(u0_array + u1_array))
+        self.q0, self.q1 = np.mean(self.q0_array), np.mean(self.q1_array)
+        self.q0_unc, self.q1_unc = np.std(self.q0_array), np.std(self.q1_array)
+        self.write('re-parameterized limb darkening params: '+str(self.q0)+' +/- '+str(self.q0_unc)+'    '+str(self.q1)+' +/- '+str(self.q1_unc))
 
         # save the re-parameterized limb_darkening values so that they can be recalled when making the model
         self.wavebin['ldparams'] = {}
-        self.wavebin['ldparams']['v0'] = self.v0
-        self.wavebin['ldparams']['v1'] = self.v1
-        self.wavebin['ldparams']['v0_unc'] = self.v0_unc
-        self.wavebin['ldparams']['v1_unc'] = self.v1_unc
+        self.wavebin['ldparams']['q0'] = self.q0
+        self.wavebin['ldparams']['q1'] = self.q1
+        self.wavebin['ldparams']['q0_unc'] = self.q0_unc
+        self.wavebin['ldparams']['q1_unc'] = self.q1_unc
 
         for subdir in self.wavebin['subdirectories']:
-            self.inputs[subdir]['tranparams'][-2], self.inputs[subdir]['tranparams'][-1] = self.v0, self.v1
+            self.inputs[subdir]['tranparams'][-2], self.inputs[subdir]['tranparams'][-1] = self.q0, self.q1
 
 

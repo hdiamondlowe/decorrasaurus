@@ -63,12 +63,12 @@ class FullFitter(Talker, Writer):
 
         # append u0+firstn to the free paramnames
         self.freeparamnames = np.append(self.freeparamnames, 'u0'+self.firstn)
-        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v0'])
-        # these additional bounds never acutally get used - Gaussian priors get used in the prior transform function; these are just place holders
+        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q0'])
+        # the 'q' versions of the limb-darkening parameters are reparameterized according to Kipping+ (2013) such that they can be uniformly sampled from [0,1]
         self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
         # append u1+firstn to the free paramnames
         self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
-        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['v1'])
+        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q1'])
         self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
                 
         # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
@@ -231,35 +231,15 @@ class FullFitter(Talker, Writer):
         # rescaling uncertainties as a free parameter during the fit (Berta, et al. 2011, references therein)
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         def lnlike(p):
-            models = modelobj.makemodel(p)
+            models = modelobj.makemodelLinear(p)
             # likelihood function; follow Berta+ (2012) for scaling
             logl = -self.numpoints * np.log(p[self.sinds]) - 0.5*(1./(p[self.sinds]**2))*np.nansum((((self.lcs - models)/self.photnoiseest)*self.binnedok)**2, axis=1)
-            print(np.sum(logl))
             return np.sum(logl)
 
-        # inverse transform sampling    
-        # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
-        v = np.linspace(0, 1, 100000)
-        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['v0'], scale=self.wavebin['ldparams']['v0_unc'])
-        ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
-        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['v1'], scale=self.wavebin['ldparams']['v1_unc'])
-        ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
-        u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
-        u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
+        span = self.mcmcbounds[1] - self.mcmcbounds[0]
         def ptform(p):
-
             x = np.array(p)
-            span = self.mcmcbounds[1] - self.mcmcbounds[0]
             x = x*span + self.mcmcbounds[0]
-            
-            if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            elif x[u0ind] > .9999: x[u0ind] = .9999
-            else: x[u0ind] = ppf_func_u0(x[u0ind])
-
-            if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            elif x[u1ind] > .9999: x[u1ind] = .9999
-            else: x[u1ind] = ppf_func_u1(x[u1ind])
-
             return x
 
         ndim = len(self.freeparamnames)
@@ -292,7 +272,7 @@ class FullFitter(Talker, Writer):
 
         #calculate rms from mcfit
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        models = modelobj.makemodel(self.mcparams[:,0])
+        models = modelobj.makemodelLinear(self.mcparams[:,0])
         resid = [(self.lcs[i] - models[i])[self.binnedok[i]] for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)

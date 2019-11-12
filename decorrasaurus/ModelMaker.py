@@ -162,16 +162,18 @@ class ModelMaker(Talker):
 
     def limbdarkconversion(self):
 
+        # convert back to u0 and u1 to make the light curve; re-parameterization from Kipping+ (2013)
+
         if self.inputs['ldlaw'] == 'sq':
-            def calc_u0u1(v0, v1):
-                u0 = (75./34.)*v0 + (45./34.)*v1
-                u1 = (45./34.)*v0 - (75./34.)*v1
+            def calc_u0u1(q0, q1):
+                u0 = np.sqrt(q0)*(1 - 2*q1)
+                u1 = 2*np.sqrt(q0)*q1
                 return [u0, u1]
 
         elif self.inputs['ldlaw'] == 'qd':
-            def calc_u0u1(v0, v1):
-                u0 = (2./5.)*v0 + (1./5.)*v1
-                u1 = (1./5.)*v0 - (2./5.)*v1
+            def calc_u0u1(q0, q1):
+                u0 = 2*np.sqrt(q0)*q1
+                u1 = np.sqrt(q0)*(1 - 2*q1)
                 return [u0, u1]
 
         return calc_u0u1
@@ -217,10 +219,10 @@ class ModelMaker(Talker):
 
         # make the model that fits to the data systematics
         # this involves making a 1d polynomial for each data set and applying it to the time array for each data set
-        polymodels = [np.poly1d(params[self.polyparaminds[i]][::-1])(self.timearrays[i]) for i in self.rangeofdirectories]
+        Lpolymodels = [np.polynomial.legendre.Legendre(params[self.polyparaminds[i]])(self.timearrays[i]) for i in self.rangeofdirectories]
 
         sysmodels = np.sum(np.multiply(params[self.sysparaminds], self.sysparamarrays), axis=1)
-        self.fitmodel = np.sum([np.array(polymodels).T, sysmodels, self.ones]).T
+        self.fitmodel = np.sum([np.array(Lpolymodels).T, sysmodels, self.ones]).T
 
         # make the transit models wiht batman
         self.batmanmodel = [self.update_batman_model(self.batmanparams[i], self.batmanmodels[i], self.batmandictionaries[i], self.batmanupdatenames[i], params[self.batmanparaminds[i]]) for i in self.rangeofdirectories]

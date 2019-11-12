@@ -337,8 +337,8 @@ class Plotter(Talker):
         elif self.inputs['samplecode'] == 'dynesty':
 
             truths = self.wavebin['lmfit']['values'][:]
-            truths.append(self.wavebin['ldparams']['v0'])
-            truths.append(self.wavebin['ldparams']['v1'])
+            truths.append(self.wavebin['ldparams']['q0'])
+            truths.append(self.wavebin['ldparams']['q1'])
             for n in range(len(self.wavebin['subdirectories'])): truths.append(1)
 
             # trace plot
