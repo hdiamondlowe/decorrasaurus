@@ -144,8 +144,8 @@ class Inputs(Talker):
 
         elif self.inputs['sysmodel'] == 'GP':
             inputs['kernelname']  = dictionary['kernelname']
-            inputs['kernelparams'] = [str_to_bool(i) for i in dictionary['kernelparams']]
-            inputs['kernelbounds'] = [[str_to_bool(i) for i in dictionary['kernelboundslo']], [str_to_bool(i) for i in dictionary['kernelboundshi']]]
+            inputs['kernelparams'] = [np.log(str_to_bool(i)) for i in dictionary['kernelparams']]
+            inputs['kernelbounds'] = [[np.log(str_to_bool(i)) for i in dictionary['kernelboundslo']], [np.log(str_to_bool(i)) for i in dictionary['kernelboundshi']]]
 
         else: 
             self.speak('ERROR! Need to define a decorrelation model for the systematics, either linear or GP')
@@ -173,6 +173,12 @@ class Inputs(Talker):
                 inputs['freeparambounds'][1].append(True)
                 inputs['freeparamnames'].append(flabel+str(self.n))
                 inputs['freeparamvalues'].append(inputs['fitparams'][f])
+            for t, tlabel in enumerate(inputs['tranlabels']):
+                if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue
+                inputs['freeparambounds'][0].append(inputs['tranbounds'][0][t])
+                inputs['freeparambounds'][1].append(inputs['tranbounds'][1][t])
+                inputs['freeparamnames'].append(tlabel+str(self.n))
+                inputs['freeparamvalues'].append(inputs['tranparams'][t])
 
         elif self.inputs['sysmodel'] == 'GP':
             if inputs['kernelname'] == 'RealTerm':
@@ -198,12 +204,14 @@ class Inputs(Talker):
                 inputs['freeparamvalues'].append(inputs['kernelparams'][k])                
                 
 
-        for t, tlabel in enumerate(inputs['tranlabels']):
-            if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue
-            inputs['freeparambounds'][0].append(inputs['tranbounds'][0][t])
-            inputs['freeparambounds'][1].append(inputs['tranbounds'][1][t])
-            inputs['freeparamnames'].append(tlabel+str(self.n))
-            inputs['freeparamvalues'].append(inputs['tranparams'][t])
+            for t, tlabel in enumerate(inputs['tranlabels']):
+                if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue
+                if inputs['tranbounds'][0][t] == True: inputs['freeparambounds'][0].append(None)
+                else: inputs['freeparambounds'][0].append(inputs['tranbounds'][0][t])
+                if inputs['tranbounds'][1][t] == True: inputs['freeparambounds'][1].append(None)
+                else: inputs['freeparambounds'][1].append(inputs['tranbounds'][1][t])
+                inputs['freeparamnames'].append(tlabel+str(self.n))
+                inputs['freeparamvalues'].append(inputs['tranparams'][t])
 
         dtind = int(np.where(np.array(inputs['tranlabels']) == 'dt')[0])
         inputs['t0'] = inputs['toff'] + inputs['tranparams'][dtind]
