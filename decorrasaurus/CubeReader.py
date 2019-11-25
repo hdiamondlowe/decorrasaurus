@@ -13,7 +13,7 @@ class CubeReader(Talker):
 
         try: 
             self.speak('trying to read in subcube')
-            self.subcube = np.load(self.inputs['directoryname']+'subcube.npy')[()]
+            self.subcube = np.load(self.inputs['directoryname']+'subcube.npy', allow_pickle=True)[()]
             self.speak('loaded in subcube') 
         except(IOError):
             self.speak('subcube does not exist, creating a new one')
@@ -34,8 +34,8 @@ class CubeReader(Talker):
     def makeSubCube(self):
 
         self.speak('reading in datacube from {0} and extracting the arrays you care about'.format(self.subdir))
-        cube = np.load(self.datacubepath)[()]
-        spec = np.load(self.specstretchpath)[()]
+        cube = np.load(self.datacubepath, allow_pickle=True)[()]
+        spec = np.load(self.specstretchpath, allow_pickle=True)[()]
 
         self.speak('making subcube of just the arrays you care about from the full cube from {0}'.format(self.subdir))
         

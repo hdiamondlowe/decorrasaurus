@@ -7,7 +7,7 @@ from dynesty import utils as dyfunc
 import lmfit
 import sys
 from ldtk import LDPSetCreator, BoxcarFilter
-from emcee.utils import MPIPool
+#from emcee.utils import MPIPool
 from .ModelMaker import ModelMaker
 from .CubeReader import CubeReader
 from .Plotter import Plotter
@@ -35,7 +35,7 @@ class FullFitter(Talker, Writer):
         
         Writer.__init__(self, self.savewave+'.txt')
 
-        self.wavebin = np.load(self.savewave+'.npy')[()]
+        self.wavebin = np.load(self.savewave+'.npy', allow_pickle=True)[()]
         if self.wavebin['mcfitdone']:
             self.speak('mcfit already exists for wavelength bin {0}'.format(self.wavefile))
             if self.inputs['samplecode'] == 'emcee':

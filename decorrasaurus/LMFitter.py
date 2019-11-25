@@ -23,7 +23,7 @@ class LMFitter(Talker, Writer):
         
         Writer.__init__(self, self.savewave+'.txt')
 
-        self.wavebin = np.load(self.savewave+'.npy')[()]
+        self.wavebin = np.load(self.savewave+'.npy', allow_pickle=True)[()]
         subdirs = self.wavebin.keys()
 
         if self.wavebin['lmfitdone']:
@@ -241,7 +241,7 @@ class LMFitter(Talker, Writer):
 
         if self.inputs['dividewhite'] and self.inputs['binlen']=='all':
             # save the transit model from the white light curve fit
-            self.dividewhite = np.load(self.inputs['directoryname']+'dividewhite.npy')[()]
+            self.dividewhite = np.load(self.inputs['directoryname']+'dividewhite.npy', allow_pickle=True)[()]
             self.speak('saving Twhite for later use by divide white routine')
             self.dividewhite['Twhite'] = modelobj.batmanmodel
             np.save(self.inputs['directoryname']+'dividewhite.npy', self.dividewhite)
