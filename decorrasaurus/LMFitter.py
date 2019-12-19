@@ -188,6 +188,13 @@ class LMFitter(Talker, Writer):
         self.linfit3 = lmfit.minimize(fcn=residuals3, params=lmfitparams, method='leastsq', **fit_kws)
         linfit3paramvals = list(self.linfit3.params.valuesdict().values())
         linfit3uncs = np.sqrt(np.diagonal(self.linfit3.covar))
+        try: linfit3uncs = np.sqrt(np.diagonal(self.linfit3.covar))
+        except(ValueError):
+            self.speak('the linear fit returned no uncertainties, consider changing tranbounds values')
+            return
+        if not np.all(np.isfinite(np.array(linfit3uncs))): 
+            self.speak('lmfit error: there were non-finite uncertainties')
+            return
         self.write('3rd lm params:')
         [self.write('    '+self.freeparamnames[i]+'    '+str(linfit3paramvals[i])+'  +/-  '+str(linfit3uncs[i])) for i in range(len(self.freeparamnames))]
 
@@ -221,13 +228,8 @@ class LMFitter(Talker, Writer):
         self.wavebin['lmfit']['freeparamvalues'] = self.freeparamvalues
         self.wavebin['lmfit']['freeparambounds'] = self.freeparambounds
         self.wavebin['lmfit']['values'] = linfit3paramvals
-        try: self.wavebin['lmfit']['uncs'] = np.sqrt(np.diagonal(self.linfit3.covar))
-        except(ValueError):
-            self.speak('the linear fit returned no uncertainties, consider changing tranbounds values')
-            return
-        if not np.all(np.isfinite(np.array(self.wavebin['lmfit']['uncs']))): 
-            self.speak('lmfit error: there were non-finite uncertainties')
-            return
+        self.wavebin['lmfit']['uncs'] = linfit3uncs
+
         fitmodel = {}
         batmanmodel = {}
         for s, subdir in enumerate(self.wavebin['subdirectories']):
@@ -256,38 +258,25 @@ class LMFitter(Talker, Writer):
 
     def runLMFitGP(self):
 
-        print('vals:', self.freeparamvalues)
-        print('bounds:', np.array(self.freeparambounds).T)
-
         self.speak('running first lmfit scaling by photon noise limits')#, making output txt file')
 
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        gps = modelobj.makemodelGP(self.freeparamvalues)
-        print(gps)
+        self.gps = modelobj.makemodelGP(self.freeparamvalues)
+        #print(gps)
 
         def neg_log_like(p):
-            print(modelobj.allparaminds[0])
-            print(np.array(p)[modelobj.allparaminds[0]])
-            [gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
-            #print(p)
-            #[print(gps[i].get_parameter_dict()) for i in self.rangeofdirectories]
-            return np.sum([-gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+            [self.gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
+            return np.sum([-self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+
 
         self.lmfit = minimize(neg_log_like, self.freeparamvalues, method='L-BFGS-B', bounds=np.array(self.freeparambounds).T)
-        linfitparamvals = self.lmfit.x
+        lmfitparamvals = self.lmfit.x
+        lmfituncs = np.sqrt(np.diagonal(self.lmfit.hess_inv*np.identity(len(self.lmfit.x))))
         self.write('1st lm params:')
-        [self.write('    '+self.freeparamnames[i]+'    '+str(linfitparamvals[i])) for i in range(len(self.freeparamnames))]
+        [self.write('    {0}    {1}  +/-  {2}'.format(self.freeparamnames[i], lmfitparamvals[i], lmfituncs[i])) for i in range(len(self.freeparamnames))]
 
-        self.freeparamvalues = np.array(linfitparamvals)
-
-        print('vals:', self.freeparamvalues)
-        print('bounds:', np.array(self.freeparambounds).T)
-
-
-        [gps[i].set_parameter_vector(np.array(linfitparamvals)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
-        models = [gps[i].predict(self.lcs[i][self.binnedok[i]], modelobj.times[i], return_cov=False) for i in self.rangeofdirectories]
-
-        print(models)
+        [self.gps[i].set_parameter_vector(np.array(lmfitparamvals)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
+        models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], modelobj.times[i], return_cov=False) for i in self.rangeofdirectories]
 
         resid = [(self.lcs[i][self.binnedok[i]] - models[i]) for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
@@ -298,20 +287,20 @@ class LMFitter(Talker, Writer):
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
 
+
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['lmfit'] = {}
         self.wavebin['lmfit']['freeparamnames']  = self.freeparamnames
-        self.wavebin['lmfit']['freeparamvalues'] = linfitparamvals
+        self.wavebin['lmfit']['freeparamvalues'] = self.freeparamvalues
         self.wavebin['lmfit']['freeparambounds'] = self.freeparambounds
-        self.wavebin['lmfit']['values'] = linfitparamvals
+        self.wavebin['lmfit']['values'] = lmfitparamvals
+        self.wavebin['lmfit']['uncs'] = lmfituncs
 
         fitmodel = {}
         batmanmodel = {}
         for s, subdir in enumerate(self.wavebin['subdirectories']):
-            batmanmodel[subdir] = gps[s].mean.get_value(modelobj.times[s])
-            fitmodel[subdir] = models[s]/gps[s].mean.get_value(modelobj.times[s])
-        print(fitmodel)
-        print(batmanmodel)
+            batmanmodel[subdir] = self.gps[s].mean.get_value(modelobj.times[s])
+            fitmodel[subdir] = models[s]/self.gps[s].mean.get_value(modelobj.times[s])
 
         self.wavebin['lmfit']['fitmodels'] = fitmodel
         self.wavebin['lmfit']['batmanmodels'] = batmanmodel
@@ -374,5 +363,8 @@ class LMFitter(Talker, Writer):
 
         for subdir in self.wavebin['subdirectories']:
             self.inputs[subdir]['tranparams'][-2], self.inputs[subdir]['tranparams'][-1] = self.q0, self.q1
+            self.inputs[subdir]['tranbounds'][0][-2], self.inputs[subdir]['tranbounds'][0][-1] = 0, 0
+            self.inputs[subdir]['tranbounds'][1][-2], self.inputs[subdir]['tranbounds'][1][-1] = 1, 1
+            
 
 

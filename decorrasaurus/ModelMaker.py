@@ -5,6 +5,7 @@ import batman
 import celerite
 from celerite.modeling import Model
 from celerite import terms
+from scipy.optimize import minimize
 
 class ModelMaker(Talker):
 
@@ -124,7 +125,9 @@ class ModelMaker(Talker):
             self.batmanparaminds.append([])
 
             n = self.inputs[subdir]['n']
-           
+
+            print(self.inputs[subdir]['tranbounds'])           
+
             for t, tranlabel in enumerate(self.inputs[subdir]['tranlabels']):
 
                 self.batmandictionaries[s][tranlabel] = self.inputs[subdir]['tranparams'][t]
@@ -142,14 +145,16 @@ class ModelMaker(Talker):
                 self.batmanparaminds[s].append(paramind)
                 self.allparaminds[s].append(paramind)
                 self.batmandictionariesfit[s][tranlabel] = self.inputs[subdir]['tranparams'][t]
-                if self.inputs[subdir]['tranbounds'][t][0] == True: bound0 = None
-                else: bound0 = self.inputs[subdir]['tranbounds'][t][0]
-                if self.inputs[subdir]['tranbounds'][t][1] == True: bound1 = None
-                else: bound1 = self.inputs[subdir]['tranbounds'][t][1]
+                if type(self.inputs[subdir]['tranbounds'][0][t]) == bool and self.inputs[subdir]['tranbounds'][0][t] == True: bound0 = None
+                else: bound0 = self.inputs[subdir]['tranbounds'][0][t]
+                if type(self.inputs[subdir]['tranbounds'][0][t]) == bool and self.inputs[subdir]['tranbounds'][1][t] == True: bound1 = None
+                else: bound1 = self.inputs[subdir]['tranbounds'][1][t]
                 self.batmandictionariesfit[s]['bounds'][tranlabel] = (bound0, bound1)
 
             # make times such that time of mid-transit should be at 0
             self.times.append((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])
+
+        print(self.batmandictionariesfit)
 
         self.batmanparams = []
         self.batmanmodels = []
@@ -159,6 +164,9 @@ class ModelMaker(Talker):
             self.batmanparams.append(setupbatmanparams)
             self.batmanmodels.append(setupbatmanmodel)
 
+        self.lcs = [self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']]
+        self.photnoiseest = [self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]
+        self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
 
     def limbdarkconversion(self):
 
@@ -231,7 +239,7 @@ class ModelMaker(Talker):
 
     def makemodelGP(self, params):
 
-        '''
+
         class meanTransitModel(Model):
             parameter_names = tuple(self.paramsTransitModel)#, 'u0', 'u1')#, 'airmasscoeff', 'offset')
 
@@ -270,6 +278,7 @@ class ModelMaker(Talker):
                 return self.batmanmodel.light_curve(self.batmanparams)
 
         mean_models = [meanTransitModel(self.batmandictionaries[i], self.batmanmodels[i], self.batmanparams[i], self.calclimbdark, self.batmandictionariesfit[i]) for i in self.rangeofdirectories]
+        
         '''
         batmanparams = batman.TransitParams()
         batmanparams.t0 = 0
@@ -280,14 +289,14 @@ class ModelMaker(Talker):
         batmanparams.ecc = 0
         batmanparams.w = 90
         batmanparams.limb_dark = 'quadratic'
-        batmanparams.u = [.5, .5] #[0.30947, 0.31279]
+        batmanparams.u = [0.3154176287079,  0.3068403536]
 
         batmanmodel = batman.TransitModel(batmanparams, self.times[0])
 
 
         class TransitModel(Model):
 
-            parameter_names = ('dt', 'rp', 'u0', 'u1')#, 'airmasscoeff', 'offset')
+            parameter_names = ('dt', 'rp')#, 'airmasscoeff', 'offset')
 
             def get_value(self, t):
 
@@ -295,7 +304,6 @@ class ModelMaker(Talker):
 
                 batmanparams.t0 = self.dt
                 batmanparams.rp = self.rp
-                batmanparams.u = [self.u0, self.u1]
 
                #quadratic = self.m*t**2
 
@@ -306,17 +314,16 @@ class ModelMaker(Talker):
 
                 return batmanmodel.light_curve(batmanparams) #* quadratic
 
-        freeparams = dict(dt=batmanparams.t0, rp=batmanparams.rp, u0=batmanparams.u[0], u1=batmanparams.u[1])#, m=-1.5)#, airmasscoeff=1.0, offset=1.0)
-        freeparams['bounds'] = dict(dt=(-0.0010376, 0.003059236), rp=(0.0001, 0.1), u0=(0.1, 0.999), u1=(0.1, 0.999))#, airmasscoeff=(-10, 10), offset=(-10, 10))
+        freeparams = dict(dt=batmanparams.t0, rp=batmanparams.rp)#, m=-1.5)#, airmasscoeff=1.0, offset=1.0)
+        freeparams['bounds'] = dict(dt=(-0.0010376, 0.003059236), rp=(0.0001, 0.1))#, airmasscoeff=(-10, 10), offset=(-10, 10))
         #freeparams['bounds'] = dict(dt=(-0.0010376, 0.003059236), rp=(0.02, 0.08), u0=(0.1, 0.999), u1=(0.1, 0.999))#, airmasscoeff=(-10, 10), offset=(-10, 10))
 
         mean_model = TransitModel(**freeparams)
-
+        '''
         gps = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             kernelparams = self.inputs[subdir]['kernelparams']
             kernelbounds = np.array(self.inputs[subdir]['kernelbounds']).T
-            print(kernelparams, kernelbounds)
             if self.inputs[subdir]['kernelname'] == 'RealTerm':
                 kernel = terms.RealTerm(log_a=kernelparams[0], log_c=kernelparams[1], 
                                bounds=dict(log_a=(kernelbounds[0][0], kernelbounds[0][1]), log_c=(kernelbounds[1][0], kernelbounds[1][1])))
@@ -329,16 +336,12 @@ class ModelMaker(Talker):
                                bounds=dict(log_S0=(kernelbounds[0][0], kernelbounds[0][1]), log_Q=(kernelbounds[1][0], kernelbounds[1][1]),
                                            log_omega0=(kernelbounds[2][0], kernelbounds[2][1])))
             elif self.inputs[subdir]['kernelname'] == 'Matern32Term':
-                print('using matern32term')
                 kernel = terms.Matern32Term(log_sigma=kernelparams[0], log_rho=kernelparams[1], 
                                bounds=dict(log_sigma=(kernelbounds[0][0], kernelbounds[0][1]), log_rho=(kernelbounds[1][0], kernelbounds[1][1])))
-            print('kernel', kernel)
 
-            gp = celerite.GP(kernel=kernel, mean=mean_model, fit_mean=True)
-            gp.compute(self.times[s])
+            gp = celerite.GP(kernel=kernel, mean=mean_models[s], fit_mean=True)
+            gp.compute(self.times[s], self.photnoiseest[s][self.wavebin[subdir]['binnedok']])
             gps.append(gp)
 
         return gps
-        
-
 

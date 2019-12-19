@@ -46,7 +46,7 @@ class RunReader(Talker, Writer):
         self.inputs = Inputs(self.subdirectories, self.rundirectory)
         self.inputs = self.inputs.inputs
 
-        self.subcube = np.load(self.rundirectory+'subcube.npy')[()]
+        self.subcube = np.load(self.rundirectory+'subcube.npy', allow_pickle=True)[()]
 
 
     def readrun(self):
@@ -62,10 +62,10 @@ class RunReader(Talker, Writer):
         self.results['allparamnames'] = []
 
         self.results['ldparams'] = {}
-        self.results['ldparams']['v0'] = []
-        self.results['ldparams']['v1'] = []
-        self.results['ldparams']['v0_unc'] = []
-        self.results['ldparams']['v1_unc'] = []
+        self.results['ldparams']['q0'] = []
+        self.results['ldparams']['q1'] = []
+        self.results['ldparams']['q0_unc'] = []
+        self.results['ldparams']['q1_unc'] = []
 
         self.results['subwavelims'] = {}
         self.results['submidwave'] = {}
@@ -78,7 +78,7 @@ class RunReader(Talker, Writer):
 
         for wfile in self.results['allwavefiles']:
             # access the information for a single wavelength bin
-            wavebin = np.load(self.rundirectory+wfile+'.npy')[()]
+            wavebin = np.load(self.rundirectory+wfile+'.npy', allow_pickle=True)[()]
 
             if wavebin['mcfitdone']: fit = 'mcfit'
             elif wavebin['lmfitdone']: fit = 'lmfit'
@@ -101,16 +101,16 @@ class RunReader(Talker, Writer):
                 #print(wfile, fitparam)
 
             if fit == 'lmfit':
-                self.results['ldparams']['v0'].append(wavebin['ldparams']['v0'])
-                self.results['ldparams']['v1'].append(wavebin['ldparams']['v1'])
-                self.results['ldparams']['v0_unc'].append(wavebin['ldparams']['v0_unc'])
-                self.results['ldparams']['v1_unc'].append(wavebin['ldparams']['v1_unc']) 
+                self.results['ldparams']['q0'].append(wavebin['ldparams']['q0'])
+                self.results['ldparams']['q1'].append(wavebin['ldparams']['q1'])
+                self.results['ldparams']['q0_unc'].append(wavebin['ldparams']['q0_unc'])
+                self.results['ldparams']['q1_unc'].append(wavebin['ldparams']['q1_unc']) 
             elif fit == 'mcfit':
                 i = np.argwhere(wavebin['freeparamnames'] == 'u0'+firstn)[0][0]
-                self.results['ldparams']['v0'].append(wavebin[fit]['values'][i])
-                self.results['ldparams']['v1'].append(wavebin[fit]['values'][i+1])
-                self.results['ldparams']['v0_unc'].append(np.mean(wavebin[fit]['uncs'][i]))
-                self.results['ldparams']['v1_unc'].append(np.mean(wavebin[fit]['uncs'][i+1]))
+                self.results['ldparams']['q0'].append(wavebin[fit]['values'][i])
+                self.results['ldparams']['q1'].append(wavebin[fit]['values'][i+1])
+                self.results['ldparams']['q0_unc'].append(np.mean(wavebin[fit]['uncs'][i]))
+                self.results['ldparams']['q1_unc'].append(np.mean(wavebin[fit]['uncs'][i+1]))
 
             for subdir in wavebin['subdirectories']:
                 self.results['subwavelims'].setdefault(subdir,[]).append(wavebin['wavelims'])
