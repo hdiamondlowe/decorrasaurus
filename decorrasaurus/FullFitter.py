@@ -252,9 +252,29 @@ class FullFitter(Talker, Writer):
             return np.sum(logl)
 
         span = self.mcmcbounds[1] - self.mcmcbounds[0]
+
+        # inverse transform sampling    
+        # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
+        v = np.linspace(0, 1, 100000)
+        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=self.wavebin['ldparams']['q0_unc'])
+        ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
+        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=self.wavebin['ldparams']['q1_unc'])
+        ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
+        u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
+        u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
         def ptform(p):
+
             x = np.array(p)
             x = x*span + self.mcmcbounds[0]
+            
+            if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            if x[u0ind] > .9999: x[u0ind] = .9999
+            else: x[u0ind] = ppf_func_u0(x[u0ind])
+
+            if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            if x[u1ind] > .9999: x[u1ind] = .9999
+            else: x[u1ind] = ppf_func_u1(x[u1ind])
+
             return x
 
         ndim = len(self.freeparamnames)
@@ -336,6 +356,7 @@ class FullFitter(Talker, Writer):
         print(self.freeparamvalues)
         print(self.mcmcbounds)
 
+        # need to know the indices that correspond to the kernel parameters; these should be log uniform priors
         kernelinds = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             n = self.inputs[subdir]['n']
@@ -343,11 +364,18 @@ class FullFitter(Talker, Writer):
             kernelinds.append([self.inputs[subdir]['freeparamnames'].index(x) for x in freekernelnames])
         print(kernelinds)
         kernelinds = np.array(kernelinds)
-
         expboundslo = np.exp(self.mcmcbounds[0])
         expspan = np.exp(self.mcmcbounds[1]) - np.exp(self.mcmcbounds[0])
-        print(expboundslo)
-        print(expspan)
+
+        # need to know limb-darkening indices; these should be Gaussian priors that are bounded between 0 and 1 (from Kipping+2013)
+        # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
+        v = np.linspace(0, 1, 100000)
+        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=self.wavebin['ldparams']['q0_unc'])
+        ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
+        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=self.wavebin['ldparams']['q1_unc'])
+        ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
+        u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
+        u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
 
         def ptform(p):
 
@@ -356,6 +384,14 @@ class FullFitter(Talker, Writer):
 
             loguniformdist = [np.log(p[i]*expspan[i] + expboundslo[i]) for i in kernelinds]
             x[kernelinds] = loguniformdist
+
+            if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            if x[u0ind] > .9999: x[u0ind] = .9999
+            else: x[u0ind] = ppf_func_u0(x[u0ind])
+
+            if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            if x[u1ind] > .9999: x[u1ind] = .9999
+            else: x[u1ind] = ppf_func_u1(x[u1ind])
 
             return x
 

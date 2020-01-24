@@ -153,7 +153,9 @@ class Plotter(Talker):
             #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
             if self.inputs['sysmodel'] == 'linear': lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
-            elif self.inputs['sysmodel'] == 'GP': lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir], 'k-', lw=2, alpha=0.5)
+            elif self.inputs['sysmodel'] == 'GP': 
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir], 'k-', lw=2, alpha=0.5)
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], fitmodels[subdir], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=16)
     
             if self.inputs['sysmodel'] == 'linear': lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
@@ -320,11 +322,15 @@ class Plotter(Talker):
             #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
             if self.inputs['sysmodel'] == 'linear': lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
-            elif self.inputs['sysmodel'] == 'GP': lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir], 'k-', lw=2, alpha=0.5)
+            elif self.inputs['sysmodel'] == 'GP': 
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir], 'k-', lw=2, alpha=0.5)
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], fitmodels[subdir], 'k-', lw=2, alpha=0.5)
             lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=16)
     
             if self.inputs['sysmodel'] == 'linear': lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
             elif self.inputs['sysmodel'] == 'GP': lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]-models[subdir], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+
+
             #lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
             lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
             lcplots['residuals'][0].set_xlabel('BJD-{}'.format(t0[n]), fontsize=16)
