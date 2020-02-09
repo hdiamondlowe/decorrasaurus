@@ -134,18 +134,23 @@ class Inputs(Talker):
         if self.n == 0:
             self.inputs['sysmodel'] = dictionary['sysmodel']
 
+        inputs['fitlabels']  = dictionary['fitlabels']
+        if type(inputs['fitlabels']) == str: inputs['fitlabels'] = [dictionary['fitlabels']]
+
         if self.inputs['sysmodel'] == 'linear':
-            inputs['fitlabels']  = dictionary['fitlabels']
-            if type(inputs['fitlabels']) == str: inputs['fitlabels'] = [dictionary['fitlabels']]
             inputs['polyfit']    = int(dictionary['polyfit'])
             inputs['polylabels'] = ['P{0}coeff'.format(x) for x in range(inputs['polyfit'])]
             inputs['fitparams']  = [1 for f in inputs['fitlabels']]
             inputs['polyparams'] = [1 for p in inputs['polylabels']]
 
         elif self.inputs['sysmodel'] == 'GP':
-            inputs['kernelname']  = dictionary['kernelname']
-            inputs['kernelparams'] = [np.log(str_to_bool(i)) for i in dictionary['kernelparams']]
-            inputs['kernelbounds'] = [[np.log(str_to_bool(i)) for i in dictionary['kernelboundslo']], [np.log(str_to_bool(i)) for i in dictionary['kernelboundshi']]]
+            inputs['kerneltypes']  = dictionary['kerneltypes']
+            if type(inputs['kerneltypes']) == str: inputs['kerneltypes'] = [dictionary['kerneltypes']]
+            assert len(inputs['fitlabels']) == len(inputs['kerneltypes']), 'You need the name number of kernels are there are decorrelation parameters'
+            # later the boundary and starting values will be calculated from the fit parameters chosen
+            listofGeorgekernels = ['Matern52Kernel', 'ExpSquaredKernel', 'Matern32Kernel', 'RationalQuadraticKernel', 'ExpKernel']
+            for kernelname in inputs['kerneltypes']:
+                assert kernelname in listofGeorgekernels, 'You need to put in valid kernel types; check the George documentation if you have to'
 
         else: 
             self.speak('ERROR! Need to define a decorrelation model for the systematics, either linear or GP')
@@ -163,16 +168,19 @@ class Inputs(Talker):
         inputs['freeparamvalues'] = []
 
         if self.inputs['sysmodel'] == 'linear':
+
             for p, plabel in enumerate(inputs['polylabels']):
                 inputs['freeparambounds'][0].append(True)
                 inputs['freeparambounds'][1].append(True)
                 inputs['freeparamnames'].append(plabel+str(self.n))
                 inputs['freeparamvalues'].append(inputs['polyparams'][p])
+
             for f, flabel in enumerate(inputs['fitlabels']):
                 inputs['freeparambounds'][0].append(True)
                 inputs['freeparambounds'][1].append(True)
                 inputs['freeparamnames'].append(flabel+str(self.n))
                 inputs['freeparamvalues'].append(inputs['fitparams'][f])
+
             for t, tlabel in enumerate(inputs['tranlabels']):
                 if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue
                 inputs['freeparambounds'][0].append(inputs['tranbounds'][0][t])
@@ -181,28 +189,6 @@ class Inputs(Talker):
                 inputs['freeparamvalues'].append(inputs['tranparams'][t])
 
         elif self.inputs['sysmodel'] == 'GP':
-            if inputs['kernelname'] == 'RealTerm':
-                assert len(inputs['kernelparams']) == 2 and len(inputs['kernelbounds'][0]) == 2 and len(inputs['kernelbounds'][1]) == 2, 'There is something wrong with the number of kernel parameters given for that kernel'
-                inputs['kernellabels'] = ['log_a', 'log_c']
-            elif inputs['kernelname'] == 'ComplexTerm':
-                assert len(inputs['kernelparams']) == 4 and len(inputs['kernelbounds'][0]) == 4 and len(inputs['kernelbounds'][1]) == 4, 'There is something wrong with the number of kernel parameters given for that kernel'
-                inputs['kernellabels'] = ['log_a', 'log_b', 'log_c', 'log_d']
-            elif inputs['kernelname'] == 'SHOTerm':
-                assert len(inputs['kernelparams']) == 3 and len(inputs['kernelbounds'][0]) == 3 and len(inputs['kernelbounds'][1]) == 3, 'There is something wrong with the number of kernel parameters given for that kernel'
-                inputs['kernellabels'] = ['log_S0', 'log_Q', 'log_omega0']
-            elif inputs['kernelname'] == 'Matern32Term':
-                assert len(inputs['kernelparams']) == 2 and len(inputs['kernelbounds'][0]) == 2 and len(inputs['kernelbounds'][1]) == 2, 'There is something wrong with the number of kernel parameters given for that kernel'
-                inputs['kernellabels'] = ['log_sigma', 'log_rho']
-            else:
-                self.speak('ERROR! If you want to use a GP, you must pick a valid mode: RealTerm, ComplexTerm, SHOTerm, or Matern32Term')
-                return
-
-            for k, klabel in enumerate(inputs['kernellabels']):
-                inputs['freeparambounds'][0].append(inputs['kernelbounds'][0][k])
-                inputs['freeparambounds'][1].append(inputs['kernelbounds'][1][k])
-                inputs['freeparamnames'].append(klabel+str(self.n))
-                inputs['freeparamvalues'].append(inputs['kernelparams'][k])                
-                
 
             for t, tlabel in enumerate(inputs['tranlabels']):
                 if type(inputs['tranbounds'][0][t]) == bool and inputs['tranbounds'][0][t] == False: continue

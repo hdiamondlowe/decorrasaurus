@@ -123,10 +123,9 @@ class LCMaker(Talker, Writer):
                         self.write('    photon noise limits:')
                         self.write('        target               comparison           T/C')
                         self.write('        '+str(np.mean(sigmaT))+'    '+str(np.mean(sigmaC))+'    '+str(np.mean(sigmaF)))
-                        if self.inputs['sysmodel'] == 'linear':
-                            self.write('    fit labels:  '+str(self.inputs[subdir]['fitlabels']))
-                        elif self.inputs['sysmodel'] == 'GP':
-                            self.write('    fit labels:  '+str(self.inputs[subdir]['kernellabels']))
+                        self.write('    fit labels:  '+str(self.inputs[subdir]['fitlabels']))
+                        if self.inputs['sysmodel'] == 'GP':
+                            self.write('    kernel labels:  '+str(self.inputs[subdir]['kerneltypes']))
                         self.write('    tran labels: '+str(self.inputs[subdir]['tranlabels']))
                         self.write('    tran params: '+str(self.inputs[subdir]['tranparams']))
                         self.write('    tran bounds: '+str(self.inputs[subdir]['tranbounds'][0])+'\n                 '+str(self.inputs[subdir]['tranbounds'][1]))
@@ -170,10 +169,30 @@ class LCMaker(Talker, Writer):
                             bin[subdir]['lc'] = raw_counts_targ/raw_counts_comps
                             bin[subdir]['compcube']  = self.cube.makeCompCube(bininds, subdir)
 
+                        # if goind GPs, need to use the information from compcupe to set up the decorrelation parameters
+
                 np.save(self.inputs['directoryname']+wavefile, bin)
                 self.speak('saved dictionary for wavelength bin {0}'.format(wavefile))
 
                 plot = Plotter(self.inputs, self.subcube)
                 plot.lcplots(bin)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

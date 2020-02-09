@@ -13,6 +13,7 @@ from .Plotter import Plotter
 from multiprocessing import Pool
 from scipy import stats
 import scipy.interpolate as interpolate
+import dill
 #import emceehelper as mc
 
 
@@ -62,15 +63,18 @@ class FullFitter(Talker, Writer):
         self.freeparamvalues = self.wavebin['lmfit']['values']
         self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
 
-        # append u0+firstn to the free paramnames
-        self.freeparamnames = np.append(self.freeparamnames, 'u0'+self.firstn)
-        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q0'])
-        # the 'q' versions of the limb-darkening parameters are reparameterized according to Kipping+ (2013) such that they can be uniformly sampled from [0,1]
-        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
-        # append u1+firstn to the free paramnames
-        self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
-        self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q1'])
-        self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+
+        if self.inputs['sysmodel'] == 'linear':
+            # append u0+firstn to the free paramnames
+            self.freeparamnames = np.append(self.freeparamnames, 'u0'+self.firstn)
+            self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q0'])
+            # the 'q' versions of the limb-darkening parameters are reparameterized according to Kipping+ (2013) such that they can be uniformly sampled from [0,1]
+            self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+            # append u1+firstn to the free paramnames
+            self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
+            self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q1'])
+            self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+        if 
                 
         # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
         if self.inputs['sysmodel'] == 'linear':
@@ -92,12 +96,6 @@ class FullFitter(Talker, Writer):
                     self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*10.
                 if self.mcmcbounds[1][i] == True: 
                     self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*10.
-        #elif self.inputs['sysmodel'] == 'GP':
-        #    for i, name in enumerate(self.wavebin['lmfit']['freeparamnames']):
-        #        if self.mcmcbounds[0][i] == None:
-        #            self.mcmcbounds[0][i] = self.wavebin['lmfit']['values'][i] - self.wavebin['lmfit']['uncs'][i]*5.
-        #        if self.mcmcbounds[1][i] == None: 
-        #            self.mcmcbounds[1][i] = self.wavebin['lmfit']['values'][i] + self.wavebin['lmfit']['uncs'][i]*5.
 
             self.mcmcbounds = np.array(self.mcmcbounds)
 
@@ -262,6 +260,7 @@ class FullFitter(Talker, Writer):
         ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
         u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
         u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
+
         def ptform(p):
 
             x = np.array(p)
@@ -280,6 +279,7 @@ class FullFitter(Talker, Writer):
         ndim = len(self.freeparamnames)
 
         self.speak('running dynesty')
+
 
         if ndim > 25: # use special inputs that will make run more efficient
             self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, bound='multi', sample='slice')
@@ -343,9 +343,9 @@ class FullFitter(Talker, Writer):
 
     def runFullFitGP_dynesty(self):
 
-        # rescaling uncertainties as a free parameter during the fit (Berta, et al. 2011, references therein)
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        self.gps = modelobj.makemodelGP(self.freeparamvalues)
+        self.gps = modelobj.makemodelGP()
+
         self.mcmcbounds = np.concatenate([np.array(self.gps[i].get_parameter_bounds()) for i in self.rangeofdirectories]).T
 
         def lnlike(p):  
@@ -353,6 +353,7 @@ class FullFitter(Talker, Writer):
             return np.sum([self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
 
         span = self.mcmcbounds[1] - self.mcmcbounds[0]
+        print(self.freeparamnames)
         print(self.freeparamvalues)
         print(self.mcmcbounds)
 
@@ -360,10 +361,12 @@ class FullFitter(Talker, Writer):
         kernelinds = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             n = self.inputs[subdir]['n']
-            freekernelnames = [label+n for label in self.inputs[subdir]['kernellabels']]
-            kernelinds.append([self.inputs[subdir]['freeparamnames'].index(x) for x in freekernelnames])
-        print(kernelinds)
+            freekernelnames = [label for label in self.wavebin[subdir]['kernellabels']]
+            kernelinds.append([list(self.freeparamnames).index(x+n) for x in freekernelnames])
+        print(self.wavebin[subdir]['kernellabels'])
+        print('kernelinds', kernelinds)
         kernelinds = np.array(kernelinds)
+
         expboundslo = np.exp(self.mcmcbounds[0])
         expspan = np.exp(self.mcmcbounds[1]) - np.exp(self.mcmcbounds[0])
 
@@ -385,13 +388,13 @@ class FullFitter(Talker, Writer):
             loguniformdist = [np.log(p[i]*expspan[i] + expboundslo[i]) for i in kernelinds]
             x[kernelinds] = loguniformdist
 
-            if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            if x[u0ind] > .9999: x[u0ind] = .9999
-            else: x[u0ind] = ppf_func_u0(x[u0ind])
+            #if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            #elif x[u0ind] > .9999: x[u0ind] = .9999
+            #else: x[u0ind] = ppf_func_u0(x[u0ind])
 
-            if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            if x[u1ind] > .9999: x[u1ind] = .9999
-            else: x[u1ind] = ppf_func_u1(x[u1ind])
+            #if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            #elif x[u1ind] > .9999: x[u1ind] = .9999
+            #else: x[u1ind] = ppf_func_u1(x[u1ind])
 
             return x
 
@@ -399,12 +402,30 @@ class FullFitter(Talker, Writer):
 
         self.speak('running dynesty')
 
-        if ndim > 25: # use special inputs that will make run more efficient
-            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, bound='multi', sample='slice')
+        testdict = {}
+        testdict['rangeofdirectories'] = self.rangeofdirectories
+        testdict['lcs'] = self.lcs
+        testdict['binnedok'] = self.binnedok
+        testdict['mcmcbounds'] = self.mcmcbounds
+        testdict['kernelinds'] = kernelinds
+        testdict['freeparamnames'] = self.freeparamnames
+        testdict['inputs'] = self.detrender.inputs
+        testdict['wavebin'] = self.wavebin
+        
+
+        np.save(self.savewave+'test', testdict)
+        print('saved test dictionary')
+
+        pool = Pool(processes=4)
+
+        if ndim > 20: # use special inputs that will make run more efficient; slice sampling will automatically be chosen 
+            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim)
             self.dsampler.run_nested(nlive_init=int(5*ndim), nlive_batch=int(5*ndim), wt_kwargs={'pfrac': 1.0}) # place 100% of the weight on the posterior, don't sample the evidence
         else: # use defaults
-            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, sample='slice')
+            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, pool=pool, queue_size=8)
             self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
+
+        print(dsampler.method, dsampler.bounding)
 
         results = self.dsampler.results
         samples = results.samples

@@ -30,8 +30,10 @@ class Detrender(Talker, Writer):
         # load in the input parameters from multiple nights of data from input.init in each night's folder
 
         self.subdirectories = [d for d in os.listdir('.') if os.path.isdir(os.path.join('.', d))]
+
         if 'run' in self.subdirectories: self.subdirectories.remove('run')
         if 'notinuse' in self.subdirectories: self.subdirectories.remove('notinuse')
+
         self.subdirectories = sorted(self.subdirectories)
 
         try: 
@@ -42,6 +44,7 @@ class Detrender(Talker, Writer):
 
         # try first loading in a saved minicube; if it doesn't exist read in the whole original cube
         self.cube = CubeReader(self.inputs.inputs, self.subdirectories)
+
 
         # try first to look for the files with the lcs already in them, eg. '7000.npy'
         self.lcs = LCMaker(self, self.subdirectories)
