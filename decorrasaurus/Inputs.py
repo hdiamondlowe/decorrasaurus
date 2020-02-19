@@ -229,6 +229,7 @@ class Inputs(Talker):
             self.inputs['dividewhite'] = str_to_bool(dictionary['dividewhite'])
             self.inputs['ldmodel']     = str_to_bool(dictionary['ldmodel'])
             self.inputs['fullsample']  = str_to_bool(dictionary['fullsample'])
+            self.inputs['dynestypool'] = str_to_bool(dictionary['dynestypool'])
             self.inputs['makeplots']   = str_to_bool(dictionary['makeplots'])
 
         inputs['datacubepath']    = dictionary['datacubepath']

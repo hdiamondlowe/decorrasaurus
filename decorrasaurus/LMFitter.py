@@ -82,13 +82,19 @@ class LMFitter(Talker, Writer):
             for n, subdir in enumerate(self.wavebin['subdirectories']):
 
                 nregressors = len(self.inputs[subdir]['fitlabels'])
-                constantkernel = kernels.ConstantKernel(np.var(self.lcs[n]), ndim=nregressors, axes=range(nregressors), bounds=[(1e-6, 5)])
+
+                constantkernelvalue = np.var(self.lcs[n])
+                constantkernelboundlo = 0.1*np.var(self.lcs[n])
+                constantkernelboundhi = 100*np.var(self.lcs[n])
+
+                constantkernel = kernels.ConstantKernel(constantkernelvalue, ndim=nregressors, axes=range(nregressors), bounds=[(constantkernelboundlo, constantkernelboundhi)])
 
                 self.wavebin[subdir]['kernellabels'] = ['constantkernel']
+                self.wavebin[subdir]['kernels'] = [constantkernel]
 
                 self.freeparamnames = np.append(self.freeparamnames, 'constantkernel{}'.format(n))
-                self.freeparamvalues = np.append(self.freeparamvalues, np.var(self.lcs[n]))
-                self.freeparambounds = np.append(self.freeparambounds, [[0.1*np.var(self.lcs[n])], [100*np.var(self.lcs[n])]], axis=1)
+                self.freeparamvalues = np.append(self.freeparamvalues, constantkernelvalue)
+                self.freeparambounds = np.append(self.freeparambounds, [[constantkernelboundlo], [constantkernelboundhi]], axis=1)
 
                 regressor_arrays = []
 
@@ -113,6 +119,7 @@ class LMFitter(Talker, Writer):
 
 
                     self.wavebin[subdir]['kernellabels'].append('{0}kernel'.format(fitlabel))
+                    self.wavebin[subdir]['kernels'].append(k)
 
                     self.freeparamnames = np.append(self.freeparamnames, '{0}kernel{1}'.format(fitlabel, n))
                     self.freeparamvalues = np.append(self.freeparamvalues, metric)
@@ -123,6 +130,8 @@ class LMFitter(Talker, Writer):
 
             # cause need these updated in the wavebin to feed into ModelMaker
             self.wavebin['freeparamnames']  = self.freeparamnames
+            self.wavebin['freeparamvalues']  = self.freeparamvalues
+            self.wavebin['freeparambounds'] = self.freeparambounds
 
     def runLMFitLinear(self):
 
@@ -307,15 +316,11 @@ class LMFitter(Talker, Writer):
 
     def runLMFitGP(self):
 
-        self.speak('running first lmfit scaling by photon noise limits')#, making output txt file')
+        self.speak('running quick minimzation for the GPs')#, making output txt file')
 
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         self.gps = modelobj.makemodelGP()
         #print(gps)
-
-        print('lmfitter freeparamnames:', self.freeparamnames)
-        print('lmfitter freeparamvals:', self.freeparamvalues)
-        print('lmfitter freeparambounds:', self.freeparambounds)
 
         def neg_log_like(p):
             [self.gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
@@ -325,13 +330,19 @@ class LMFitter(Talker, Writer):
         self.lmfit = minimize(neg_log_like, self.freeparamvalues, method='L-BFGS-B', bounds=np.array(self.freeparambounds).T)
         lmfitparamvals = self.lmfit.x
         lmfituncs = np.sqrt(np.diagonal(self.lmfit.hess_inv*np.identity(len(self.lmfit.x))))
-        self.write('1st lm params:')
+        self.write('params from quick minimization:')
         [self.write('    {0}    {1}  +/-  {2}'.format(self.freeparamnames[i], lmfitparamvals[i], lmfituncs[i])) for i in range(len(self.freeparamnames))]
 
         regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.wavebin[s]['binnedok']] for s in self.inputs['subdirectories']]
 
         [self.gps[i].set_parameter_vector(np.array(lmfitparamvals)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
         models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+
+        for s, subdir in enumerate(self.inputs['subdirectories']):
+            self.wavebin[subdir]['kernelmus'] = []
+            for kernel in self.wavebin[subdir]['kernels']:
+                mu = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=kernel)
+                self.wavebin[subdir]['kernelmus'].append(mu)
 
         resid = [(self.lcs[i][self.binnedok[i]] - models[i]) for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
@@ -341,7 +352,6 @@ class LMFitter(Talker, Writer):
         # how many times the expected noise is the rms?
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
-
 
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['lmfit'] = {}
@@ -418,7 +428,7 @@ class LMFitter(Talker, Writer):
 
         for subdir in self.wavebin['subdirectories']:
             self.inputs[subdir]['tranparams'][-2], self.inputs[subdir]['tranparams'][-1] = self.q0, self.q1
-            self.inputs[subdir]['tranbounds'][0][-2], self.inputs[subdir]['tranbounds'][0][-1] = 0.001, 0.001
-            self.inputs[subdir]['tranbounds'][1][-2], self.inputs[subdir]['tranbounds'][1][-1] = 0.999, 0.999
+            self.inputs[subdir]['tranbounds'][0][-2], self.inputs[subdir]['tranbounds'][0][-1] = max(self.q0-5*self.q0_unc, 0.01), max(self.q1-5*self.q1_unc, 0.01)
+            self.inputs[subdir]['tranbounds'][1][-2], self.inputs[subdir]['tranbounds'][1][-1] = min(self.q0+5*self.q0_unc, 0.99), min(self.q1+5*self.q1_unc, 0.99)
             
 

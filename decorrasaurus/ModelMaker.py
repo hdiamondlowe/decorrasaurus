@@ -5,6 +5,7 @@ import batman
 import george
 from george.modeling import Model
 from scipy.optimize import minimize
+import dill as pickle
 
 class ModelMaker(Talker):
 
@@ -101,11 +102,9 @@ class ModelMaker(Talker):
         self.calclimbdark = self.limbdarkconversion()
         self.batmandictionaries = []
         self.batmandictionariesfit = []
-        self.batmanupdatenames = []
         self.batmanparaminds = []
         self.paramsTransitModel = []
         self.times = []
-        self.fitparams = []
         self.kernels = []
 
         firstdir = self.wavebin['subdirectories'][0]
@@ -118,14 +117,13 @@ class ModelMaker(Talker):
             self.batmandictionaries.append({})
             self.batmandictionariesfit.append({})
             self.batmandictionariesfit[s]['bounds'] = {}
-            self.batmanupdatenames.append([])
             self.batmanparaminds.append([])
 
             n = self.inputs[subdir]['n']
 
             self.kernels.append(self.wavebin[subdir]['gpkernel'])
             
-            print(self.inputs[subdir]['tranbounds'])           
+            #print(self.inputs[subdir]['tranbounds'])           
 
             for t, tranlabel in enumerate(self.inputs[subdir]['tranlabels']):
 
@@ -140,27 +138,23 @@ class ModelMaker(Talker):
                     paramind =  np.argwhere(np.array(self.wavebin['freeparamnames']) == tranlabel+firstn)[0][0]
                 else: continue
 
-                self.batmanupdatenames[s].append(tranlabel)
+                # past here in the loop, everything should be a free parameter!
                 self.batmanparaminds[s].append(paramind)
                 self.allparaminds[s].append(paramind)
-                self.batmandictionariesfit[s][tranlabel] = self.inputs[subdir]['tranparams'][t]
-                if type(self.inputs[subdir]['tranbounds'][0][t]) == bool and self.inputs[subdir]['tranbounds'][0][t] == True: bound0 = None
-                else: bound0 = self.inputs[subdir]['tranbounds'][0][t]
-                if type(self.inputs[subdir]['tranbounds'][0][t]) == bool and self.inputs[subdir]['tranbounds'][1][t] == True: bound1 = None
-                else: bound1 = self.inputs[subdir]['tranbounds'][1][t]
-                self.batmandictionariesfit[s]['bounds'][tranlabel] = (bound0, bound1)
+                self.batmandictionariesfit[s][tranlabel] = self.wavebin['freeparamvalues'][paramind]
+
+                boundlo = self.wavebin['freeparambounds'][0][paramind]
+                boundhi = self.wavebin['freeparambounds'][1][paramind]
+                self.batmandictionariesfit[s]['bounds'][tranlabel] = (boundlo, boundhi)
 
             for k, klabel in enumerate(self.wavebin[subdir]['kernellabels']):
-                print(klabel)
-                print(self.wavebin['freeparamnames'])
                 self.allparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == klabel+n)[0][0])
 
             # make times such that time of mid-transit should be at 0
             self.times.append((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])
 
-            print('allparaminds:', self.allparaminds)
 
-        print(self.batmandictionariesfit)
+        #print(self.batmandictionariesfit)
 
         self.batmanparams = []
         self.batmanmodels = []
@@ -278,13 +272,16 @@ class ModelMaker(Talker):
                 
                 try: 
                     self.batmanparams.u = self.calclimbdark(self.u0, self.u1)
-                    print('u0, u1:', self.calclimbdark(self.u0, self.u1))
+                    #print('u0, u1:', self.calclimbdark(self.u0, self.u1))
                 except(AttributeError): 
                     self.batmanparams.u = self.calclimbdark(self.batmandictionary['u0'], self.batmandictionary['u1'])   #limb darkening coefficients
 
 
                 # now return a light curve
                 return self.batmanmodel.light_curve(self.batmanparams)
+
+        print(self.batmandictionaries)
+        print(self.batmandictionariesfit)
 
         mean_models = [meanTransitModel(self.batmandictionaries[i], self.batmanmodels[i], self.batmanparams[i], self.calclimbdark, self.batmandictionariesfit[i]) for i in self.rangeofdirectories]
         
@@ -293,9 +290,10 @@ class ModelMaker(Talker):
         for s, subdir in enumerate(self.wavebin['subdirectories']):
 
             gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True)
+            #gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True, white_noise=1, fit_white_noise=True)
             gp.compute(self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], self.photnoiseest[s][self.wavebin[subdir]['binnedok']])
 
-            print(gp.get_parameter_dict())
+            #print(gp.get_parameter_dict())
 
             gps.append(gp)
 

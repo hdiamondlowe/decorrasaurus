@@ -15,6 +15,6 @@ import matplotlib.pyplot as plt, numpy as np, scipy
 
 import os, sys
 sys.path.append('/home/hdiamond/local/lib/python2.7/site-packages/')
-sys.path.append('/h/mulan0/code/')
-sys.path.append('/h/mulan0/code/mosasaurus')
-sys.path.append('/h/mulan0/code/decorrasaurus')
+sys.path.append('/pool/starbuck0/code/')
+sys.path.append('/pool/starbuck0/code/mosasaurus')
+sys.path.append('/pool/starbuck0/code/decorrasaurus')

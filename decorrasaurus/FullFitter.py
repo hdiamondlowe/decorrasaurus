@@ -6,15 +6,14 @@ from dynesty.plotting import _quantile
 from dynesty import utils as dyfunc
 import lmfit
 import sys
-from ldtk import LDPSetCreator, BoxcarFilter
 from .ModelMaker import ModelMaker
-from .CubeReader import CubeReader
 from .Plotter import Plotter
 from multiprocessing import Pool
 from scipy import stats
 import scipy.interpolate as interpolate
-import dill
+import dill as pickle
 #import emceehelper as mc
+#import dynestyhelper
 
 
 class FullFitter(Talker, Writer):
@@ -74,7 +73,22 @@ class FullFitter(Talker, Writer):
             self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
             self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q1'])
             self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
-        if 
+
+        elif self.inputs['sysmodel'] == 'GP':
+            # need to put the limb darkening coefficients in front of the kernels
+            # !!! MAKE SURE THIS WORKS FOR MULTIPLE DATA SETS FIT JOINTLY !!!
+            kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
+            self.freeparamnames = np.insert(self.freeparamnames, kernelind, ['u0{}'.format(self.firstn), 'u1{}'.format(self.firstn)])
+            self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [self.wavebin['ldparams']['q0'], self.wavebin['ldparams']['q1']])
+            boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
+            boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
+            
+            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)
+            
+        # will need these in ModelMaker
+        self.wavebin['freeparamnames'] = self.freeparamnames
+        self.wavebin['freeparamvalues']  = self.freeparamvalues
+        self.wavebin['freeparambounds'] = self.freeparambounds
                 
         # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
         if self.inputs['sysmodel'] == 'linear':
@@ -83,8 +97,6 @@ class FullFitter(Talker, Writer):
                 self.freeparamnames = np.append(self.freeparamnames, 's'+n)
                 self.freeparamvalues = np.append(self.freeparamvalues, 1)
                 self.freeparambounds = np.append(self.freeparambounds, [[0.01], [10.]], axis=1)
-
-        self.wavebin['freeparamnames'] = self.freeparamnames
 
         self.mcmcbounds = [[],[]]
         self.mcmcbounds[0] = [i for i in self.freeparambounds[0]]
@@ -346,30 +358,6 @@ class FullFitter(Talker, Writer):
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         self.gps = modelobj.makemodelGP()
 
-        self.mcmcbounds = np.concatenate([np.array(self.gps[i].get_parameter_bounds()) for i in self.rangeofdirectories]).T
-
-        def lnlike(p):  
-            [self.gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
-            return np.sum([self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
-
-        span = self.mcmcbounds[1] - self.mcmcbounds[0]
-        print(self.freeparamnames)
-        print(self.freeparamvalues)
-        print(self.mcmcbounds)
-
-        # need to know the indices that correspond to the kernel parameters; these should be log uniform priors
-        kernelinds = []
-        for s, subdir in enumerate(self.wavebin['subdirectories']):
-            n = self.inputs[subdir]['n']
-            freekernelnames = [label for label in self.wavebin[subdir]['kernellabels']]
-            kernelinds.append([list(self.freeparamnames).index(x+n) for x in freekernelnames])
-        print(self.wavebin[subdir]['kernellabels'])
-        print('kernelinds', kernelinds)
-        kernelinds = np.array(kernelinds)
-
-        expboundslo = np.exp(self.mcmcbounds[0])
-        expspan = np.exp(self.mcmcbounds[1]) - np.exp(self.mcmcbounds[0])
-
         # need to know limb-darkening indices; these should be Gaussian priors that are bounded between 0 and 1 (from Kipping+2013)
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
         v = np.linspace(0, 1, 100000)
@@ -380,54 +368,94 @@ class FullFitter(Talker, Writer):
         u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
         u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
 
-        def ptform(p):
-
-            x = np.array(p)
-            x = x*span + self.mcmcbounds[0]
-
-            loguniformdist = [np.log(p[i]*expspan[i] + expboundslo[i]) for i in kernelinds]
-            x[kernelinds] = loguniformdist
-
-            #if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            #elif x[u0ind] > .9999: x[u0ind] = .9999
-            #else: x[u0ind] = ppf_func_u0(x[u0ind])
-
-            #if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            #elif x[u1ind] > .9999: x[u1ind] = .9999
-            #else: x[u1ind] = ppf_func_u1(x[u1ind])
-
-            return x
+        # need to know the indices that correspond to the kernel parameters; these should be log uniform priors
+        kernelinds = []
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            n = self.inputs[subdir]['n']
+            freekernelnames = [label for label in self.wavebin[subdir]['kernellabels']]
+            kernelinds.append([list(self.freeparamnames).index(x+n) for x in freekernelnames])
+        kernelinds = np.array(kernelinds)
 
         ndim = len(self.freeparamnames)
 
-        self.speak('running dynesty')
+        if self.inputs['dynestypool']:
 
-        testdict = {}
-        testdict['rangeofdirectories'] = self.rangeofdirectories
-        testdict['lcs'] = self.lcs
-        testdict['binnedok'] = self.binnedok
-        testdict['mcmcbounds'] = self.mcmcbounds
-        testdict['kernelinds'] = kernelinds
-        testdict['freeparamnames'] = self.freeparamnames
-        testdict['inputs'] = self.detrender.inputs
-        testdict['wavebin'] = self.wavebin
-        
+            try: 
+                self.speak('retreiving dynesty results from pooled run on dynestyhelper')
+                with open(self.savewave+'test.pkl', 'rb') as f: pooldict = pickle.load(f)
+                dsampler_method, dsampler_bounding = pooldict['dsampler_method'], pooldict['dsampler_bounding']
+                results = pooldict['results']
+                #os.remove(self.savewave+'test.pkl')
+                self.speak('retrieved results and removed saved dictionary')
+                
+            except(FileNotFoundError): 
+                pooldict = {}
+                pooldict['modelobj'] = modelobj
+                #pooldict['gps'] = self.gps
+                pooldict['rangeofdirectories'] = self.rangeofdirectories
+                pooldict['lcs'] = self.lcs
+                pooldict['binnedok'] = self.binnedok
+                pooldict['mcmcbounds'] = self.mcmcbounds
+                pooldict['kernelinds'] = kernelinds
+                pooldict['ndim'] = ndim
+                pooldict['inputs'] = self.detrender.inputs
+                pooldict['wavebin'] = self.wavebin
+                pooldict['savewave'] = self.savewave
 
-        np.save(self.savewave+'test', testdict)
-        print('saved test dictionary')
+                with open(self.savewave+'test.pkl', 'wb') as f: pickle.dump(pooldict, f)
+                self.speak('saved pool dictionary')
+                self.speak('You need to run the special dynestyhelper script!')
+                return
 
-        pool = Pool(processes=4)
+        else:
 
-        if ndim > 20: # use special inputs that will make run more efficient; slice sampling will automatically be chosen 
-            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim)
-            self.dsampler.run_nested(nlive_init=int(5*ndim), nlive_batch=int(5*ndim), wt_kwargs={'pfrac': 1.0}) # place 100% of the weight on the posterior, don't sample the evidence
-        else: # use defaults
-            self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, pool=pool, queue_size=8)
-            self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
+            self.mcmcbounds = np.concatenate([np.array(self.gps[i].get_parameter_bounds()) for i in self.rangeofdirectories]).T
 
-        print(dsampler.method, dsampler.bounding)
+            span = self.mcmcbounds[1] - self.mcmcbounds[0]
 
-        results = self.dsampler.results
+            expboundslo = np.exp(self.mcmcbounds[0])
+            expspan = np.exp(self.mcmcbounds[1]) - np.exp(self.mcmcbounds[0])
+
+            def lnlike(p):  
+                [self.gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
+                return np.sum([self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+
+            def ptform(p):
+
+                x = np.array(p)
+                x = x*span + self.mcmcbounds[0]
+
+                loguniformdist = [np.log(p[i]*expspan[i] + expboundslo[i]) for i in kernelinds]
+                x[kernelinds] = loguniformdist
+                
+                # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+                #if x[u0ind] < 0.0001: x[u0ind] = 0.0001     
+                #elif x[u0ind] > .9999: x[u0ind] = .9999
+                #else: x[u0ind] = ppf_func_u0(x[u0ind])
+
+                # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+                #if x[u1ind] < 0.0001: x[u1ind] = 0.0001     
+                #elif x[u1ind] > .9999: x[u1ind] = .9999
+                #else: x[u1ind] = ppf_func_u1(x[u1ind])
+
+            return x
+
+            if ndim > 20: # use special inputs that will make run more efficient; slice sampling will automatically be chosen 
+                self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim)
+                # place 100% of the weight on the posterior, don't sample the evidence
+                self.dsampler.run_nested(nlive_init=int(5*ndim), nlive_batch=int(5*ndim), wt_kwargs={'pfrac': 1.0})
+            else: # use defaults
+                self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim, pool=pool, queue_size=8)
+                self.dsampler.run_nested(wt_kwargs={'pfrac': 1.0})
+
+            dsampler_method, dsampler_bounding = self.dsampler.method, self.dsampler.bounding
+
+        self.speak('dynesty method: {}, dynesty bounding: {}'.format(dsampler_method, dsampler_bounding))
+        self.write('dynesty method: {}, dynesty bounding: {}'.format(dsampler_method, dsampler_bounding))
+
+        self.speak('dynesty evidence: {}'.format(results['logz'][-1]))
+        self.write('dynesty evidence: {}'.format(results['logz'][-1]))
+
         samples = results.samples
         # get the best fit +/- 1sigma uncertainties for each parameter; need to weight by the scaled logwt so that the "burn-in" samples are down-weighted
         quantiles = [dyfunc.quantile(samps, [.16, .5, .84], weights=np.exp(results['logwt']-results['logwt'][-1])) for samps in samples.T]
@@ -444,9 +472,11 @@ class FullFitter(Talker, Writer):
         self.write('     parameter        value                  plus                  minus')
         [self.write('     '+self.freeparamnames[i]+'     '+str(self.mcparams[i][0])+'     '+str(self.mcparams[i][1])+'     '+str(self.mcparams[i][2])) for i in range(len(self.freeparamnames))]
 
+        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.wavebin[s]['binnedok']] for s in self.inputs['subdirectories']]
+
         #calculate rms from mcfit
         [self.gps[i].set_parameter_vector(np.array(self.mcparams[:,0])[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
-        models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], modelobj.times[i], return_cov=False) for i in self.rangeofdirectories]
+        models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
 
         resid = [(self.lcs[i][self.binnedok[i]] - models[i]) for i in self.rangeofdirectories]
         allresid = np.hstack(resid)
