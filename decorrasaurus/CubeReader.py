@@ -68,6 +68,8 @@ class CubeReader(Talker):
         subcube['dwidth'] = deepcopy(cube['cubes']['width'])           # [star](time, wave)
         subcube['peak'] = deepcopy(cube['cubes']['peak'])              # [star](time, wave)
 
+        subcube['time'] = subcube['bjd'] - (self.inputs['T0'] + self.inputs['P']*self.inputs[self.subdir]['epochnum'])
+
         self.subcube[self.subdir] = subcube
 
     def makeCompCube(self, subbinindices, subdir):
@@ -86,7 +88,7 @@ class CubeReader(Talker):
 
         for key in self.inputs[subdir]['fitlabels']:
 
-            if key in ['airmass', 'rotangle']:
+            if key in ['airmass', 'rotangle', 'time']:
                 self.compcube[key] = (self.subcube[subdir][key] - np.mean(self.subcube[subdir][key]))/(np.std(self.subcube[subdir][key]))
 
                 if self.inputs['invvar']: 

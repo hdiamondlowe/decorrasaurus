@@ -77,13 +77,14 @@ class FullFitter(Talker, Writer):
         elif self.inputs['sysmodel'] == 'GP':
             # need to put the limb darkening coefficients in front of the kernels
             # !!! MAKE SURE THIS WORKS FOR MULTIPLE DATA SETS FIT JOINTLY !!!
-            kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
+            kernelind = np.where(self.freeparamnames == 'whitenoise{}'.format(self.firstn))[0][0]
+            #kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
             self.freeparamnames = np.insert(self.freeparamnames, kernelind, ['u0{}'.format(self.firstn), 'u1{}'.format(self.firstn)])
             self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [self.wavebin['ldparams']['q0'], self.wavebin['ldparams']['q1']])
-            boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
-            boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
+            #boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
+            #boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
             
-            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)
+            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.001, 0.999], [0.001, 0.999]], axis=1)
             
         # will need these in ModelMaker
         self.wavebin['freeparamnames'] = self.freeparamnames
@@ -369,12 +370,16 @@ class FullFitter(Talker, Writer):
         u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
 
         # need to know the indices that correspond to the kernel parameters; these should be log uniform priors
-        kernelinds = []
+        whitenoiseinds, constantinds, kernelinds = [], [], []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             n = self.inputs[subdir]['n']
+            whitenoiseinds.append(list(self.freeparamnames).index('whitenoise'+n))
             freekernelnames = [label for label in self.wavebin[subdir]['kernellabels']]
-            kernelinds.append([list(self.freeparamnames).index(x+n) for x in freekernelnames])
-        kernelinds = np.array(kernelinds)
+            constantkernel = freekernelnames[0]
+            otherkernels = freekernelnames[1:]
+            constantinds.append(list(self.freeparamnames).index(constantkernel+n))
+            kernelinds.append([list(self.freeparamnames).index(x+n) for x in otherkernels])
+        whtienoiseinds, constantinds, kernelinds = np.array(whitenoiseinds), np.array(constantinds), np.array(kernelinds)
 
         ndim = len(self.freeparamnames)
 
@@ -391,16 +396,19 @@ class FullFitter(Talker, Writer):
             except(FileNotFoundError): 
                 pooldict = {}
                 pooldict['modelobj'] = modelobj
-                #pooldict['gps'] = self.gps
                 pooldict['rangeofdirectories'] = self.rangeofdirectories
                 pooldict['lcs'] = self.lcs
                 pooldict['binnedok'] = self.binnedok
                 pooldict['mcmcbounds'] = self.mcmcbounds
+                pooldict['whitenoiseinds'] = whitenoiseinds
+                pooldict['constantinds'] = constantinds
                 pooldict['kernelinds'] = kernelinds
                 pooldict['ndim'] = ndim
                 pooldict['inputs'] = self.detrender.inputs
                 pooldict['wavebin'] = self.wavebin
                 pooldict['savewave'] = self.savewave
+                pooldict['u0ind'], pooldict['u1ind'] = u0ind, u1ind
+                pooldict['ppf_func_u0'], pooldict['ppf_func_u1'] = ppf_func_u0, ppf_func_u1
 
                 with open(self.savewave+'test.pkl', 'wb') as f: pickle.dump(pooldict, f)
                 self.speak('saved pool dictionary')
@@ -408,7 +416,6 @@ class FullFitter(Talker, Writer):
                 return
 
         else:
-
             self.mcmcbounds = np.concatenate([np.array(self.gps[i].get_parameter_bounds()) for i in self.rangeofdirectories]).T
 
             span = self.mcmcbounds[1] - self.mcmcbounds[0]
@@ -429,14 +436,14 @@ class FullFitter(Talker, Writer):
                 x[kernelinds] = loguniformdist
                 
                 # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-                #if x[u0ind] < 0.0001: x[u0ind] = 0.0001     
-                #elif x[u0ind] > .9999: x[u0ind] = .9999
-                #else: x[u0ind] = ppf_func_u0(x[u0ind])
+                if x[u0ind] < 0.0001: x[u0ind] = 0.0001     
+                elif x[u0ind] > .9999: x[u0ind] = .9999
+                else: x[u0ind] = ppf_func_u0(x[u0ind])
 
                 # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-                #if x[u1ind] < 0.0001: x[u1ind] = 0.0001     
-                #elif x[u1ind] > .9999: x[u1ind] = .9999
-                #else: x[u1ind] = ppf_func_u1(x[u1ind])
+                if x[u1ind] < 0.0001: x[u1ind] = 0.0001     
+                elif x[u1ind] > .9999: x[u1ind] = .9999
+                else: x[u1ind] = ppf_func_u1(x[u1ind])
 
             return x
 

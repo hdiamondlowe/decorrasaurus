@@ -106,6 +106,7 @@ class ModelMaker(Talker):
         self.paramsTransitModel = []
         self.times = []
         self.kernels = []
+        self.whitenoise = []
 
         firstdir = self.wavebin['subdirectories'][0]
         firstn = self.inputs[firstdir]['n']
@@ -122,6 +123,7 @@ class ModelMaker(Talker):
             n = self.inputs[subdir]['n']
 
             self.kernels.append(self.wavebin[subdir]['gpkernel'])
+            self.whitenoise.append(self.wavebin[subdir]['gpwhitenoise'])
             
             #print(self.inputs[subdir]['tranbounds'])           
 
@@ -133,7 +135,7 @@ class ModelMaker(Talker):
                     if tranlabel+firstn in self.wavebin['freeparamnames']: self.paramsTransitModel.append(tranlabel)
 
                 if tranlabel+n in self.wavebin['freeparamnames']:
-                    paramind = np.argwhere(self.wavebin['freeparamnames'] == tranlabel+str(n))[0][0]
+                    paramind = np.argwhere(self.wavebin['freeparamnames'] == tranlabel+n)[0][0]
                 elif (tranlabel in self.inputs['jointparams']) and (tranlabel+firstn in self.wavebin['freeparamnames']):
                     paramind =  np.argwhere(np.array(self.wavebin['freeparamnames']) == tranlabel+firstn)[0][0]
                 else: continue
@@ -146,6 +148,9 @@ class ModelMaker(Talker):
                 boundlo = self.wavebin['freeparambounds'][0][paramind]
                 boundhi = self.wavebin['freeparambounds'][1][paramind]
                 self.batmandictionariesfit[s]['bounds'][tranlabel] = (boundlo, boundhi)
+
+            whitenoiseparamind = np.argwhere(self.wavebin['freeparamnames'] == 'whitenoise'+n)[0][0]
+            self.allparaminds[s].append(whitenoiseparamind)
 
             for k, klabel in enumerate(self.wavebin[subdir]['kernellabels']):
                 self.allparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == klabel+n)[0][0])
@@ -280,20 +285,18 @@ class ModelMaker(Talker):
                 # now return a light curve
                 return self.batmanmodel.light_curve(self.batmanparams)
 
-        print(self.batmandictionaries)
-        print(self.batmandictionariesfit)
-
         mean_models = [meanTransitModel(self.batmandictionaries[i], self.batmanmodels[i], self.batmanparams[i], self.calclimbdark, self.batmandictionariesfit[i]) for i in self.rangeofdirectories]
         
 
         gps = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
 
-            gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True)
-            #gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True, white_noise=1, fit_white_noise=True)
+            #gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True)
+            gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True, white_noise=self.whitenoise[s], fit_white_noise=True)
             gp.compute(self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], self.photnoiseest[s][self.wavebin[subdir]['binnedok']])
 
-            #print(gp.get_parameter_dict())
+            print(gp.get_parameter_dict())
+            print(gp.get_parameter_bounds())
 
             gps.append(gp)
 

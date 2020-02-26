@@ -1,6 +1,7 @@
 from .imports import *
 from scipy.optimize import minimize
 import lmfit
+import george
 from george import kernels
 #import os
 from ldtk import LDPSetCreator, BoxcarFilter
@@ -83,18 +84,23 @@ class LMFitter(Talker, Writer):
 
                 nregressors = len(self.inputs[subdir]['fitlabels'])
 
-                constantkernelvalue = np.var(self.lcs[n])
-                constantkernelboundlo = 0.1*np.var(self.lcs[n])
-                constantkernelboundhi = 100*np.var(self.lcs[n])
+                whitenoisevalue = np.log(1e-6)
+                whitenoiseboundlo, whitenoiseboundhi = np.log(1e-7), np.log(1e-5)
 
+                constantkernelvalue = np.var(self.lcs[n])
+                constantkernelboundlo, constantkernelboundhi = 0.1*np.var(self.lcs[n]), 10*np.var(self.lcs[n])
                 constantkernel = kernels.ConstantKernel(constantkernelvalue, ndim=nregressors, axes=range(nregressors), bounds=[(constantkernelboundlo, constantkernelboundhi)])
 
                 self.wavebin[subdir]['kernellabels'] = ['constantkernel']
                 self.wavebin[subdir]['kernels'] = [constantkernel]
 
-                self.freeparamnames = np.append(self.freeparamnames, 'constantkernel{}'.format(n))
-                self.freeparamvalues = np.append(self.freeparamvalues, constantkernelvalue)
-                self.freeparambounds = np.append(self.freeparambounds, [[constantkernelboundlo], [constantkernelboundhi]], axis=1)
+                self.freeparamnames = np.append(self.freeparamnames, ['whitenoise{}'.format(n), 'constantkernel{}'.format(n)])
+                self.freeparamvalues = np.append(self.freeparamvalues, [whitenoisevalue, constantkernelvalue])
+                self.freeparambounds = np.append(self.freeparambounds, [[whitenoiseboundlo, constantkernelboundlo], [whitenoiseboundhi, constantkernelboundhi]], axis=1)
+
+                #self.freeparamnames = np.append(self.freeparamnames, 'constantkernel{}'.format(n))
+                #self.freeparamvalues = np.append(self.freeparamvalues, constantkernelvalue)
+                #self.freeparambounds = np.append(self.freeparambounds, [[constantkernelboundlo], [constantkernelboundhi]], axis=1)
 
                 regressor_arrays = []
 
@@ -105,28 +111,31 @@ class LMFitter(Talker, Writer):
                     regressor_array = self.wavebin[subdir]['compcube'][fitlabel]
                     regressor_arrays.append(regressor_array)
                     regressor_array_spacing = np.abs(np.mean(np.diff(regressor_array)))
-                    regressor_array_range = 5*(regressor_array.max() - regressor_array.min())
+                    regressor_array_range = 2*(regressor_array.max() - regressor_array.min())
 
                     boundlo = np.log(1/regressor_array_range)
                     boundhi = np.log(1/regressor_array_spacing)
                     metric = 1/regressor_array_spacing
+                    print('metric', metric)
 
                     if kerneltype == 'ExpSquaredKernel':
                         k = kernels.ExpSquaredKernel(metric=metric, ndim=nregressors, axes=i, metric_bounds=[(boundlo, boundhi)])
 
+                    print(k.get_parameter_dict())
+
                     if i == 0: fitkernel = k
                     else: fitkernel += k
-
 
                     self.wavebin[subdir]['kernellabels'].append('{0}kernel'.format(fitlabel))
                     self.wavebin[subdir]['kernels'].append(k)
 
                     self.freeparamnames = np.append(self.freeparamnames, '{0}kernel{1}'.format(fitlabel, n))
-                    self.freeparamvalues = np.append(self.freeparamvalues, metric)
+                    self.freeparamvalues = np.append(self.freeparamvalues, np.log(metric))
                     self.freeparambounds = np.append(self.freeparambounds, [[boundlo], [boundhi]], axis=1)
 
-            self.wavebin[subdir]['gpkernel'] = constantkernel*fitkernel
-            self.wavebin[subdir]['gpregressor_arrays'] = np.array(regressor_arrays)
+                self.wavebin[subdir]['gpkernel'] = constantkernel*fitkernel
+                self.wavebin[subdir]['gpwhitenoise'] = whitenoisevalue
+                self.wavebin[subdir]['gpregressor_arrays'] = np.array(regressor_arrays)
 
             # cause need these updated in the wavebin to feed into ModelMaker
             self.wavebin['freeparamnames']  = self.freeparamnames
@@ -356,7 +365,7 @@ class LMFitter(Talker, Writer):
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['lmfit'] = {}
         self.wavebin['lmfit']['freeparamnames']  = self.freeparamnames
-        self.wavebin['lmfit']['freeparamvalues'] = self.freeparamvalues
+        self.wavebin['lmfit']['freeparamvalues'] = np.concatenate([self.gps[i] for i in self.rangeofdirectories])
         self.wavebin['lmfit']['freeparambounds'] = self.freeparambounds
         self.wavebin['lmfit']['values'] = lmfitparamvals
         self.wavebin['lmfit']['uncs'] = lmfituncs
