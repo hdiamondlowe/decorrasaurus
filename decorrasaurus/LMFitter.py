@@ -7,6 +7,7 @@ from george import kernels
 from ldtk import LDPSetCreator, BoxcarFilter
 from .ModelMaker import ModelMaker
 from .Plotter import Plotter
+from copy import deepcopy
 
 class LMFitter(Talker, Writer):
 
@@ -25,7 +26,6 @@ class LMFitter(Talker, Writer):
         Writer.__init__(self, self.savewave+'.txt')
 
         self.wavebin = np.load(self.savewave+'.npy', allow_pickle=True)[()]
-        subdirs = self.wavebin.keys()
 
         if self.wavebin['lmfitdone']:
             self.speak('lmfit already exists for wavelength bin {0}'.format(self.wavefile))
@@ -77,30 +77,43 @@ class LMFitter(Talker, Writer):
 
         self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
 
+        firstdir = self.wavebin['subdirectories'][0]
+
         # if we're doing a GP then we need to set up the kernels for each night
         if self.inputs['sysmodel'] == 'GP':
 
-            for n, subdir in enumerate(self.wavebin['subdirectories']):
+            # for some weird reason you need a long string in here so that you can insert the full strings you want to. we'll delete it at the end.
+            self.freeparamnames = np.append(self.freeparamnames, 'thisisaweirdstringtoputhere')
 
+            for s, subdir in enumerate(self.wavebin['subdirectories']):
+
+                n = self.inputs[subdir]['n']
                 nregressors = len(self.inputs[subdir]['fitlabels'])
 
-                whitenoisevalue = np.log(1e-6)
-                whitenoiseboundlo, whitenoiseboundhi = np.log(1e-7), np.log(1e-5)
+                whitenoisevalue = np.log(500e-6**2)
+                whitenoiseboundlo, whitenoiseboundhi = np.log(5e-6**2), np.log(5000e-6**2)
 
-                constantkernelvalue = np.var(self.lcs[n])
-                constantkernelboundlo, constantkernelboundhi = 0.1*np.var(self.lcs[n]), 10*np.var(self.lcs[n])
-                constantkernel = kernels.ConstantKernel(constantkernelvalue, ndim=nregressors, axes=range(nregressors), bounds=[(constantkernelboundlo, constantkernelboundhi)])
+                constantkernelvalue = np.log(np.var(self.lcs[s]))
+                constantkernelboundlo, constantkernelboundhi = np.log(0.01*np.var(self.lcs[s])), np.log(100*np.var(self.lcs[s]))
+                constantkernel = kernels.ConstantKernel(constantkernelvalue, ndim=nregressors, axes=range(nregressors))
 
                 self.wavebin[subdir]['kernellabels'] = ['constantkernel']
                 self.wavebin[subdir]['kernels'] = [constantkernel]
 
-                self.freeparamnames = np.append(self.freeparamnames, ['whitenoise{}'.format(n), 'constantkernel{}'.format(n)])
-                self.freeparamvalues = np.append(self.freeparamvalues, [whitenoisevalue, constantkernelvalue])
-                self.freeparambounds = np.append(self.freeparambounds, [[whitenoiseboundlo, constantkernelboundlo], [whitenoiseboundhi, constantkernelboundhi]], axis=1)
+                endswithn = [freeparam.endswith(n) for freeparam in self.freeparamnames]
+                endswithninds = np.array(np.where(endswithn)).flatten()
+                lastn = endswithninds[-1]
+                insertn = lastn+1
 
-                #self.freeparamnames = np.append(self.freeparamnames, 'constantkernel{}'.format(n))
-                #self.freeparamvalues = np.append(self.freeparamvalues, constantkernelvalue)
+                self.freeparamnames = np.insert(self.freeparamnames, insertn, ['whitenoise{0}'.format(n), 'constantkernel{0}'.format(n)])
+                self.freeparamvalues = np.insert(self.freeparamvalues, insertn, [whitenoisevalue, constantkernelvalue])
+                self.freeparambounds = np.insert(self.freeparambounds, insertn, [[whitenoiseboundlo, constantkernelboundlo], [whitenoiseboundhi, constantkernelboundhi]], axis=1)
+                #self.freeparamnames = np.append(self.freeparamnames, ['constantkernel{}'.format(n)])
+                #self.freeparamvalues = np.append(self.freeparamvalues, [constantkernelvalue])
                 #self.freeparambounds = np.append(self.freeparambounds, [[constantkernelboundlo], [constantkernelboundhi]], axis=1)
+    
+                # bump up the insertion spot to account for the whitenoise and constantkernel positions
+                insertn += 2
 
                 regressor_arrays = []
 
@@ -110,18 +123,17 @@ class LMFitter(Talker, Writer):
 
                     regressor_array = self.wavebin[subdir]['compcube'][fitlabel]
                     regressor_arrays.append(regressor_array)
+                    regressor_array_range = 100*(regressor_array.max() - regressor_array.min())
                     regressor_array_spacing = np.abs(np.mean(np.diff(regressor_array)))
-                    regressor_array_range = 2*(regressor_array.max() - regressor_array.min())
 
                     boundlo = np.log(1/regressor_array_range)
                     boundhi = np.log(1/regressor_array_spacing)
-                    metric = 1/regressor_array_spacing
-                    print('metric', metric)
+                    #if fitlabel == 'width': boundhi = np.log(7500)
+                    log_inverse_length_scale = np.log(1/(5*(regressor_array.max() - regressor_array.min())))
+                    metric = 1/regressor_array_range #(1/np.exp(log_inverse_length_scale))**2
 
                     if kerneltype == 'ExpSquaredKernel':
-                        k = kernels.ExpSquaredKernel(metric=metric, ndim=nregressors, axes=i, metric_bounds=[(boundlo, boundhi)])
-
-                    print(k.get_parameter_dict())
+                        k = kernels.ExpSquaredKernel(metric, ndim=nregressors, axes=i)
 
                     if i == 0: fitkernel = k
                     else: fitkernel += k
@@ -129,13 +141,15 @@ class LMFitter(Talker, Writer):
                     self.wavebin[subdir]['kernellabels'].append('{0}kernel'.format(fitlabel))
                     self.wavebin[subdir]['kernels'].append(k)
 
-                    self.freeparamnames = np.append(self.freeparamnames, '{0}kernel{1}'.format(fitlabel, n))
-                    self.freeparamvalues = np.append(self.freeparamvalues, np.log(metric))
-                    self.freeparambounds = np.append(self.freeparambounds, [[boundlo], [boundhi]], axis=1)
+                    self.freeparamnames = np.insert(self.freeparamnames, insertn, '{0}kernel{1}'.format(fitlabel, n))
+                    self.freeparamvalues = np.insert(self.freeparamvalues, insertn, np.log(metric))
+                    self.freeparambounds = np.insert(self.freeparambounds, insertn, [boundlo, boundhi], axis=1)
 
                 self.wavebin[subdir]['gpkernel'] = constantkernel*fitkernel
                 self.wavebin[subdir]['gpwhitenoise'] = whitenoisevalue
                 self.wavebin[subdir]['gpregressor_arrays'] = np.array(regressor_arrays)
+
+            self.freeparamnames = np.delete(self.freeparamnames, len(self.freeparamnames)-1)
 
             # cause need these updated in the wavebin to feed into ModelMaker
             self.wavebin['freeparamnames']  = self.freeparamnames
@@ -325,30 +339,108 @@ class LMFitter(Talker, Writer):
 
     def runLMFitGP(self):
 
-        self.speak('running quick minimzation for the GPs')#, making output txt file')
+        self.speak('running 1st minimzation for the GPs')#, making output txt file')
+        self.wavebin['savewave'] = self.savewave
 
+        # clip out transit data points
+        self.wavebin['fitmean'] = False
+        #binnedokcopy = [deepcopy(self.wavebin[subdir]['binnedok']) for subdir in self.wavebin['subdirectories']]
+
+        #for s, subdir in enumerate(self.wavebin['subdirectories']):
+        #    intransit = (self.cube.subcube[subdir]['bjd'] > self.inputs[subdir]['t0']-(0.51*self.inputs['Tdur'])) * (self.cube.subcube[subdir]['bjd'] < self.inputs[subdir]['t0']+(0.51*self.inputs['Tdur']))
+        #    self.wavebin[subdir]['binnedok'] *= np.invert(intransit)
+        #self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
+        
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         self.gps = modelobj.makemodelGP()
-        #print(gps)
+
+        initnames = np.hstack([self.freeparamnames[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
+        initvals = np.hstack([self.freeparamvalues[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
+        initbounds = np.vstack([self.freeparambounds.T[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
+
+        localgpparaminds = []
+        lastparamind = 0
+        for i in self.rangeofdirectories:
+            localgpparaminds.append([])
+            localgpparaminds[i].append(np.arange(lastparamind, lastparamind+len(modelobj.gpparaminds[i])))
+            lastparamind += len(modelobj.gpparaminds[i])
 
         def neg_log_like(p):
-            [self.gps[i].set_parameter_vector(np.array(p)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
-            return np.sum([-self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+            [self.gps[i].set_parameter_vector(np.array(p)[localgpparaminds[i]]) for i in self.rangeofdirectories]
+            neg_log_likes = np.array([-self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+            if np.any(neg_log_likes == np.inf):
+                infinites = np.argwhere(neg_log_likes == np.inf)[0]
+                neg_log_likes[infinites] = 1e25
+            return np.sum(neg_log_likes)
 
+        def grad_neg_log_like(p):
+            [self.gps[i].set_parameter_vector(np.array(p)[localgpparaminds[i]]) for i in self.rangeofdirectories]
+            if len(self.rangeofdirectories) > 1:
+                grad_neg_log_likes = np.sum([-self.gps[i].grad_lnlikelihood(self.lcs[i][self.binnedok[i]], quiet=True) for i in self.rangeofdirectories], axis=1) # should return same number of values as gpparaminds; this will not work if diff. numbers of kernels.....
+            else: grad_neg_log_likes = -self.gps[0].grad_lnlikelihood(self.lcs[0][self.binnedok[0]], quiet=True)
+            return grad_neg_log_likes
 
-        self.lmfit = minimize(neg_log_like, self.freeparamvalues, method='L-BFGS-B', bounds=np.array(self.freeparambounds).T)
-        lmfitparamvals = self.lmfit.x
-        lmfituncs = np.sqrt(np.diagonal(self.lmfit.hess_inv*np.identity(len(self.lmfit.x))))
-        self.write('params from quick minimization:')
-        [self.write('    {0}    {1}  +/-  {2}'.format(self.freeparamnames[i], lmfitparamvals[i], lmfituncs[i])) for i in range(len(self.freeparamnames))]
+        self.lmfit1 = minimize(neg_log_like, initvals, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
+        lmfitparamvals1 = self.lmfit1.x
+        lmfituncs1 = np.sqrt(np.diagonal(self.lmfit1.hess_inv*np.identity(len(self.lmfit1.x))))
+        self.write('params from 1st minimization:')
+        [self.write('    {0}    {1}  +/-  {2}'.format(initnames[i], lmfitparamvals1[i], lmfituncs1[i])) for i in range(len(initnames))]
 
-        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.wavebin[s]['binnedok']] for s in self.inputs['subdirectories']]
+        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.binnedok[i]] for i, s in enumerate(self.inputs['subdirectories'])]
 
-        [self.gps[i].set_parameter_vector(np.array(lmfitparamvals)[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
+        [self.gps[i].set_parameter_vector(np.array(lmfitparamvals1)[localgpparaminds[i]]) for i in self.rangeofdirectories]
         models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
 
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            resid = (self.lcs[s][self.binnedok[s]] - models[s]) # don't include masked points in residuals
+            lcnans = np.ones_like(resid)
+            lcnans[:] = np.nan
+            residnans = np.ones_like(resid)
+            residnans[:] = np.nan
+
+            # median absolute deviation
+            mad = np.median(abs(resid - np.median(resid)))
+            scale = 1.4826
+            data_unc = scale*mad               # scale x median absolute deviation
+            
+            # find indices that do not meet clipping requirement
+            clippoint = (resid > (self.inputs['sigclip']*data_unc)) | (resid < (-self.inputs['sigclip']*data_unc)) # boolean array; true if point does not meet clipping requirements
+            lcnans[clippoint] = self.lcs[s][self.binnedok[s]][clippoint]
+            residnans[clippoint] = resid[clippoint]
+            self.wavebin[subdir]['lcclipped'] = lcnans
+            self.wavebin[subdir]['residclipped'] = residnans
+
+            # remake 'binnedok'
+            goodinds = np.where(self.wavebin[subdir]['binnedok'])[0] # indices that were fed into the model
+            clipinds = goodinds[clippoint] # just the indices that should be clipped
+            self.wavebin[subdir]['binnedokunclipped'] = deepcopy(self.wavebin[subdir]['binnedok'])
+            self.wavebin[subdir]['binnedok'][clipinds] = False
+            self.binnedok[s][clipinds] = False
+
+            # save new 'binnedok' to wavebin to be used later
+            self.write('clipped points for {0}: {1}'.format(subdir, clipinds))
+        np.save(self.savewave, self.wavebin)
+
+        self.speak('running 2nd minimzation for the GPs')#, making output txt file')
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
+        self.gps = modelobj.makemodelGP()
+
+        self.lmfit2 = minimize(neg_log_like, lmfitparamvals1, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
+        lmfitparamvals2 = self.lmfit2.x
+        lmfituncs2 = np.sqrt(np.diagonal(self.lmfit2.hess_inv*np.identity(len(self.lmfit2.x))))
+        self.write('params from 1st minimization:')
+        [self.write('    {0}    {1}  +/-  {2}'.format(initnames[i], lmfitparamvals2[i], lmfituncs2[i])) for i in range(len(initnames))]
+
+        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.binnedok[i]] for i, s in enumerate(self.inputs['subdirectories'])]
+
+        [self.gps[i].set_parameter_vector(np.array(lmfitparamvals2)[localgpparaminds[i]]) for i in self.rangeofdirectories]
+        models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+        
         for s, subdir in enumerate(self.inputs['subdirectories']):
             self.wavebin[subdir]['kernelmus'] = []
+            pred, pred_var = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_var=True)
+            self.wavebin[subdir]['model_var'] = pred_var
+            
             for kernel in self.wavebin[subdir]['kernels']:
                 mu = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=kernel)
                 self.wavebin[subdir]['kernelmus'].append(mu)
@@ -362,27 +454,39 @@ class LMFitter(Talker, Writer):
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
 
+        finallmfitvalues = np.array(self.freeparamvalues)
+        for i in self.rangeofdirectories: finallmfitvalues[modelobj.gpparaminds[i]] = lmfitparamvals2[localgpparaminds[i]]
+
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['lmfit'] = {}
         self.wavebin['lmfit']['freeparamnames']  = self.freeparamnames
-        self.wavebin['lmfit']['freeparamvalues'] = np.concatenate([self.gps[i] for i in self.rangeofdirectories])
+        self.wavebin['lmfit']['freeparamvalues'] = self.freeparamvalues
         self.wavebin['lmfit']['freeparambounds'] = self.freeparambounds
-        self.wavebin['lmfit']['values'] = lmfitparamvals
-        self.wavebin['lmfit']['uncs'] = lmfituncs
+        self.wavebin['lmfit']['values'] = finallmfitvalues
+        self.wavebin['lmfit']['uncs'] = np.ones(len(self.freeparamvalues))
 
         fitmodel = {}
         batmanmodel = {}
         for s, subdir in enumerate(self.wavebin['subdirectories']):
-            batmanmodel[subdir] = self.gps[s].mean.get_value(modelobj.times[s])
+            batmanmodel[subdir] = np.ones_like(self.lcs[s][self.binnedok[s]])
             fitmodel[subdir] = models[s]/batmanmodel[subdir]
 
         self.wavebin['lmfit']['fitmodels'] = fitmodel
         self.wavebin['lmfit']['batmanmodels'] = batmanmodel
         self.wavebin['lmfitdone'] = True
+
+        # do a quick save in case there's an error in the plotting
         np.save(self.savewave, self.wavebin)
 
         plot = Plotter(self.inputs, self.cube.subcube)
         plot.lmplots(self.wavebin)
+
+        # revert to binned ok that does not eliminate transit
+        #for s, subdir in enumerate(self.wavebin['subdirectories']): self.wavebin[subdir]['binnedok'] = binnedokcopy[s]
+
+        # re-save the wavebin to reflect the correct binnedok arrays
+        np.save(self.savewave, self.wavebin)
+
 
         self.speak('done with lmfit for wavelength bin {0}'.format(self.wavefile))
 
@@ -408,7 +512,12 @@ class LMFitter(Talker, Writer):
             u0_array = chains[:,:,0]
             u1_array = chains[:,:,1]
         elif self.inputs['ldlaw'] == 'qd': 
-            u , u_unc = ps.coeffs_qd(do_mc=True)                  # Estimate non-linear law coefficients
+            u , u_unc = ps.coeffs_qd(do_mc=True)                  # Estimate quadratic law with triangle method from Kipping+ (2013)
+            chains = np.array(ps._samples['qd'])
+            u0_array = chains[:,:,0]
+            u1_array = chains[:,:,1]
+        elif self.inputs['ldlaw'] == 'lg':                        # logarithmic law (Espinoza+ 2016) This law does not exist in ldtk, but that's okay we only need the boudns
+            u, u_unc = ps.coeffs_qd(do_mc=True)
             chains = np.array(ps._samples['qd'])
             u0_array = chains[:,:,0]
             u1_array = chains[:,:,1]
@@ -424,6 +533,9 @@ class LMFitter(Talker, Writer):
         elif self.inputs['ldlaw'] == 'qd':
             self.q0_array = (u0_array + u1_array)**2
             self.q1_array = u0_array/(2*(u0_array + u1_array))
+        elif self.inputs['ldlaw'] == 'lg':
+            self.q0_array = (1 - u1_array)**2
+            self.q1_array = (1 - u0_array)/(1 - u1_array)
         self.q0, self.q1 = np.mean(self.q0_array), np.mean(self.q1_array)
         self.q0_unc, self.q1_unc = np.std(self.q0_array), np.std(self.q1_array)
         self.write('re-parameterized limb darkening params: '+str(self.q0)+' +/- '+str(self.q0_unc)+'    '+str(self.q1)+' +/- '+str(self.q1_unc))

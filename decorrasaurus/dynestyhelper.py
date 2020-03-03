@@ -33,8 +33,13 @@ class dynestyhelper(Talker):
             self.rundirectory = './run/'+rundirectories[-1]+'/'
             self.speak('the dynesty helper is using the last run in directory {0}'.format(self.rundirectory))
 
-        #return self.rundirectory
+        #self.wavefiles = []
+        #for file in os.listdir(self.rundirectory):
+        #    if file.endswith('.npy'): self.wavefiles.append(file)
 
+        self.wavefiles = [w[:-4] for w in os.listdir(self.rundirectory) if w.endswith('.npy')]
+        if 'subcube' in self.wavefiles: self.wavefiles.remove('subcube')
+        self.wavefiles.sort(key = lambda f: float(f.split('-')[0]))
 
 
 

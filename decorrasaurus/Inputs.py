@@ -146,7 +146,7 @@ class Inputs(Talker):
         elif self.inputs['sysmodel'] == 'GP':
             inputs['kerneltypes']  = dictionary['kerneltypes']
             if type(inputs['kerneltypes']) == str: inputs['kerneltypes'] = [dictionary['kerneltypes']]
-            assert len(inputs['fitlabels']) == len(inputs['kerneltypes']), 'You need the name number of kernels are there are decorrelation parameters'
+            assert len(inputs['fitlabels']) == len(inputs['kerneltypes']), 'You need the same number of kernels are there are decorrelation parameters'
             # later the boundary and starting values will be calculated from the fit parameters chosen
             listofGeorgekernels = ['Matern52Kernel', 'ExpSquaredKernel', 'Matern32Kernel', 'RationalQuadraticKernel', 'ExpKernel']
             for kernelname in inputs['kerneltypes']:

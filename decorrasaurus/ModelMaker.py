@@ -1,11 +1,11 @@
 
-
 from imports import *
 import batman
 import george
 from george.modeling import Model
 from scipy.optimize import minimize
 import dill as pickle
+import datetime
 
 class ModelMaker(Talker):
 
@@ -107,6 +107,7 @@ class ModelMaker(Talker):
         self.times = []
         self.kernels = []
         self.whitenoise = []
+        self.gpparaminds = []
 
         firstdir = self.wavebin['subdirectories'][0]
         firstn = self.inputs[firstdir]['n']
@@ -119,6 +120,7 @@ class ModelMaker(Talker):
             self.batmandictionariesfit.append({})
             self.batmandictionariesfit[s]['bounds'] = {}
             self.batmanparaminds.append([])
+            self.gpparaminds.append([])
 
             n = self.inputs[subdir]['n']
 
@@ -151,9 +153,12 @@ class ModelMaker(Talker):
 
             whitenoiseparamind = np.argwhere(self.wavebin['freeparamnames'] == 'whitenoise'+n)[0][0]
             self.allparaminds[s].append(whitenoiseparamind)
+            self.gpparaminds[s].append(whitenoiseparamind)
 
             for k, klabel in enumerate(self.wavebin[subdir]['kernellabels']):
-                self.allparaminds[s].append(np.argwhere(np.array(self.wavebin['freeparamnames']) == klabel+n)[0][0])
+                kernelparamind = np.argwhere(np.array(self.wavebin['freeparamnames']) == klabel+n)[0][0]
+                self.allparaminds[s].append(kernelparamind)
+                self.gpparaminds[s].append(kernelparamind)
 
             # make times such that time of mid-transit should be at 0
             self.times.append((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])
@@ -189,6 +194,13 @@ class ModelMaker(Talker):
                 u1 = np.sqrt(q0)*(1 - 2*q1)
                 return [u0, u1]
 
+        # conversion to logarithmic law from Espinoza+ (2016)
+        elif self.inputs['ldlaw'] == 'lg':
+            def calc_u0u1(q0,q1):
+                u0 = 1 - np.sqrt(q0)*q1
+                u1 = 1 - np.sqrt(q0)
+                return [u0, u1]
+
         return calc_u0u1
 
     def setup_batman_model(self, dictionary, times):
@@ -203,6 +215,7 @@ class ModelMaker(Talker):
         batmanparams.w = dictionary['omega']                        #longitude of periastron (in degrees)
         if self.inputs['ldlaw'] == 'qd': batmanparams.limb_dark = "quadratic"        #limb darkening model
         elif self.inputs['ldlaw'] == 'sq': batmanparams.limb_dark = "squareroot"        #limb darkening model
+        elif self.inputs['ldlaw'] == 'lg':  batmanparams.limb_dark = "logarithmic"
         batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])                   #limb darkening coefficients
 
         batmanmodel = batman.TransitModel(batmanparams, times)    #initializes model
@@ -291,15 +304,33 @@ class ModelMaker(Talker):
         gps = []
         for s, subdir in enumerate(self.wavebin['subdirectories']):
 
-            #gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True)
-            gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True, white_noise=self.whitenoise[s], fit_white_noise=True)
+            if self.wavebin['fitmean'] == True:
+                gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=True, white_noise=self.whitenoise[s], fit_white_noise=True)
+            else: 
+                gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=False, white_noise=self.whitenoise[s], fit_white_noise=True)
+
             gp.compute(self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], self.photnoiseest[s][self.wavebin[subdir]['binnedok']])
 
-            print(gp.get_parameter_dict())
-            print(gp.get_parameter_bounds())
-
+            #print(gp.get_parameter_dict())
+            #print(gp.get_parameter_bounds())
+            
+            '''        
+            if self.wavebin['fitmean'] == True:
+                pred, pred_var = gp.predict(self.lcs[s][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], return_var=True)#, kernel=airmasskernel)
+                plt.figure('modelmaker before minimize')
+                plt.fill_between(self.times[s], pred - np.sqrt(pred_var), pred + np.sqrt(pred_var), color='C0', alpha=0.2)
+                plt.errorbar(self.times[s], self.lcs[s][self.wavebin[subdir]['binnedok']], yerr=self.photnoiseest[s][self.wavebin[subdir]['binnedok']], fmt='k.', alpha=0.4)
+            else: 
+                pred, pred_var = gp.predict(self.lcs[s][self.wavebin[subdir]['binnedok']]-1, self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], return_var=True)#, kernel=airmasskernel)
+                plt.figure('modelmaker before minimize')
+                plt.fill_between(self.times[s], pred - np.sqrt(pred_var), pred + np.sqrt(pred_var), color='C0', alpha=0.2)
+                plt.errorbar(self.times[s], self.lcs[s][self.wavebin[subdir]['binnedok']]-1, yerr=self.photnoiseest[s][self.wavebin[subdir]['binnedok']], fmt='k.', alpha=0.4)
+            plt.plot(self.times[s], pred)
+            plt.show()
+            plt.savefig(self.wavebin['savewave']+datetime.datetime.now().strftime("%H:%M:%S")+'.png')
+            plt.show()
+            '''
             gps.append(gp)
-
 
         return gps
 
