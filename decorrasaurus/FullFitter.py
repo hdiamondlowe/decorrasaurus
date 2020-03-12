@@ -77,23 +77,21 @@ class FullFitter(Talker, Writer):
 
         elif self.inputs['sysmodel'] == 'GP':
             # need to put the limb darkening coefficients in front of the kernels
-            # !!! MAKE SURE THIS WORKS FOR MULTIPLE DATA SETS FIT JOINTLY !!!
             kernelind = np.where(self.freeparamnames == 'whitenoise{}'.format(self.firstn))[0][0]
             #kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
             self.freeparamnames = np.insert(self.freeparamnames, kernelind, ['u0{}'.format(self.firstn), 'u1{}'.format(self.firstn)])
             self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [self.wavebin['ldparams']['q0'], self.wavebin['ldparams']['q1']])
-            #self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [0.25, 0.4])
-            boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
-            boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
-            
-            #self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.001, 0.999], [0.001, 0.999]], axis=1)
-            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)
+            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.001, 0.999], [0.001, 0.999]], axis=1)
+
+            #boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
+            #boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
+            #self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)            
             
         # will need these in ModelMaker
         self.wavebin['freeparamnames'] = self.freeparamnames
         self.wavebin['freeparamvalues']  = self.freeparamvalues
         self.wavebin['freeparambounds'] = self.freeparambounds
-                
+
         # add these scaling parameters to fit for; ideally they would be 1 but likely they will turn out slightly higher
         if self.inputs['sysmodel'] == 'linear':
             for subdir in self.wavebin['subdirectories']:
@@ -404,12 +402,12 @@ class FullFitter(Talker, Writer):
         if self.inputs['dynestypool']:
 
             try: 
-                self.speak('retreiving dynesty results from pooled run on dynestyhelper')
+                self.speak('trying to retrieve dynesty results from pooled run on dynestyhelper')
                 with open(self.savewave+'_dynestypool.pkl', 'rb') as f: pooldict = pickle.load(f)
                 dsampler_method, dsampler_bounding = pooldict['dsampler_method'], pooldict['dsampler_bounding']
                 results = pooldict['results']
                 #os.remove(self.savewave+'_dynestypool.pkl')
-                self.speak('retrieved results and removed saved dictionary')
+                self.speak('retrieved results from pool dictionary')
                 
             except(FileNotFoundError): 
                 pooldict = {}
@@ -431,6 +429,10 @@ class FullFitter(Talker, Writer):
                 with open(self.savewave+'_dynestypool.pkl', 'wb') as f: pickle.dump(pooldict, f)
                 self.speak('saved pool dictionary')
                 self.speak('you need to run the special dynestyhelper script!')
+                return
+
+            except('KeyError'):
+                self.speak('it looks like there is a dictionary with pool values, but the results are not in yet!')
                 return
 
         else:
@@ -484,6 +486,14 @@ class FullFitter(Talker, Writer):
         quantiles = [dyfunc.quantile(samps, [.16, .5, .84], weights=np.exp(results['logwt']-results['logwt'][-1])) for samps in samples.T]
         self.mcparams = np.array(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), quantiles))) # had to add list() for python3
 
+        #self.mcparams[:,0][kernelinds.flatten()] = (1./np.exp(self.mcparams[:,0][kernelinds.flatten()]))**2
+        #self.mcparams[:,][kernelinds.flatten()] = (1./np.exp(self.mcparams[:,0][kernelinds.flatten()]))**2
+        #self.mcparams[:,0][kernelinds.flatten()] = (1./np.exp(self.mcparams[:,0][kernelinds.flatten()]))**2
+        #try:
+        #    self.mcparams[kernelinds.flatten()] = np.log(1./np.exp(self.mcparams[kernelinds.flatten()]))
+        #except:
+        #    print('indexing did not work!!')
+
         self.speak('saving mcfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['mcfit'] = {}
         self.wavebin['mcfit']['results'] = results
@@ -495,14 +505,17 @@ class FullFitter(Talker, Writer):
         self.write('     parameter        value                  plus                  minus')
         [self.write('     '+self.freeparamnames[i]+'     '+str(self.mcparams[i][0])+'     '+str(self.mcparams[i][1])+'     '+str(self.mcparams[i][2])) for i in range(len(self.freeparamnames))]
 
-        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.wavebin[s]['binnedok']] for s in self.inputs['subdirectories']]
+        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.wavebin[s]['binnedok']] for s in self.wavebin['subdirectories']]
 
         #calculate rms from mcfit
         [self.gps[i].set_parameter_vector(np.array(self.mcparams[:,0])[modelobj.allparaminds[i]]) for i in self.rangeofdirectories]
         models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
 
-        for s, subdir in enumerate(self.inputs['subdirectories']):
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
             self.wavebin[subdir]['kernelmus'] = []
+            pred, pred_var = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_var=True)
+            self.wavebin[subdir]['model_var'] = pred_var
+            
             for kernel in self.wavebin[subdir]['kernels']:
                 mu = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=kernel)
                 self.wavebin[subdir]['kernelmus'].append(mu)

@@ -313,23 +313,7 @@ class ModelMaker(Talker):
 
             #print(gp.get_parameter_dict())
             #print(gp.get_parameter_bounds())
-            
-            '''        
-            if self.wavebin['fitmean'] == True:
-                pred, pred_var = gp.predict(self.lcs[s][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], return_var=True)#, kernel=airmasskernel)
-                plt.figure('modelmaker before minimize')
-                plt.fill_between(self.times[s], pred - np.sqrt(pred_var), pred + np.sqrt(pred_var), color='C0', alpha=0.2)
-                plt.errorbar(self.times[s], self.lcs[s][self.wavebin[subdir]['binnedok']], yerr=self.photnoiseest[s][self.wavebin[subdir]['binnedok']], fmt='k.', alpha=0.4)
-            else: 
-                pred, pred_var = gp.predict(self.lcs[s][self.wavebin[subdir]['binnedok']]-1, self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], return_var=True)#, kernel=airmasskernel)
-                plt.figure('modelmaker before minimize')
-                plt.fill_between(self.times[s], pred - np.sqrt(pred_var), pred + np.sqrt(pred_var), color='C0', alpha=0.2)
-                plt.errorbar(self.times[s], self.lcs[s][self.wavebin[subdir]['binnedok']]-1, yerr=self.photnoiseest[s][self.wavebin[subdir]['binnedok']], fmt='k.', alpha=0.4)
-            plt.plot(self.times[s], pred)
-            plt.show()
-            plt.savefig(self.wavebin['savewave']+datetime.datetime.now().strftime("%H:%M:%S")+'.png')
-            plt.show()
-            '''
+
             gps.append(gp)
 
         return gps

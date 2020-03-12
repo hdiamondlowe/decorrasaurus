@@ -91,13 +91,13 @@ class CubeReader(Talker):
 
             if key in ['airmass', 'rotangle', 'time']:
 
-                if (key == 'airmass') and (self.inputs['sysmodel'] == 'GP'):
-                    airmass = self.subcube[subdir][key]
-                    spl = UnivariateSpline(np.arange(len(airmass)), airmass, k=5)
-                    smoothedairmass = spl(np.arange(len(airmass)))
-                    self.compcube[key] = (smoothedairmass - np.mean(smoothedairmass))/(np.std(smoothedairmass))
+                #if (key == 'airmass') and (self.inputs['sysmodel'] == 'GP'):
+                #    airmass = self.subcube[subdir][key]
+                #    spl = UnivariateSpline(np.arange(len(airmass)), airmass, k=5)
+                #    smoothedairmass = spl(np.arange(len(airmass)))
+                #    self.compcube[key] = (smoothedairmass - np.mean(smoothedairmass))/(np.std(smoothedairmass))
 
-                else: self.compcube[key] = (self.subcube[subdir][key] - np.mean(self.subcube[subdir][key]))/(np.std(self.subcube[subdir][key]))
+                self.compcube[key] = (self.subcube[subdir][key] - np.mean(self.subcube[subdir][key]))/(np.std(self.subcube[subdir][key]))
 
                 if self.inputs['invvar']: 
                     self.speak('weighting by inverse variance')

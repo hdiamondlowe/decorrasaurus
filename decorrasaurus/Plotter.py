@@ -183,7 +183,8 @@ class Plotter(Talker):
 
                 for k, kernelmu in enumerate(self.wavebin[subdir]['kernelmus']):
                     normmu = kernelmu-batmanmodels[subdir]
-                    normmu /= np.mean(normmu)
+                    normmu -= np.mean(normmu)
+                    #if self.wavebin[subdir]['kernellabels'][k] != 'constantkernel': normmu /= np.mean(normmu)
                     kernelplots['kernels{}'.format(s)].plot(times, normmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k])
                 kernelplots['kernels{}'.format(s)].legend(loc='best', fontsize=13)
 
@@ -383,7 +384,9 @@ class Plotter(Talker):
                 kernelplots['residuals{}'.format(s)] = plt.subplot(gs[4,s])
 
                 times = self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[s]
+                pred_var = self.wavebin[subdir]['model_var']
 
+                kernelplots['data{}'.format(s)].fill_between(times, models[subdir] - np.sqrt(pred_var), models[subdir] + np.sqrt(pred_var), color='C0', alpha=0.2)
                 kernelplots['data{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'k.', alpha=0.5, label=subdir)
                 kernelplots['data{}'.format(s)].plot(times, fitmodels[subdir], lw=3, color='k', alpha=0.6)
                 kernelplots['data{}'.format(s)].plot(times, models[subdir], lw=3, color='C0', alpha=0.6)
@@ -391,7 +394,8 @@ class Plotter(Talker):
 
                 for k, kernelmu in enumerate(self.wavebin[subdir]['kernelmus']):
                     normmu = kernelmu-batmanmodels[subdir]
-                    normmu /= np.mean(normmu)
+                    normmu -= np.mean(normmu)
+                    #if self.wavebin[subdir]['kernellabels'][k] != 'constantkernel': normmu /= np.mean(normmu)
                     kernelplots['kernels{}'.format(s)].plot(times, normmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k])
                 kernelplots['kernels{}'.format(s)].legend(loc='best', fontsize=13)
 

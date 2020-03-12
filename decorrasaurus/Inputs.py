@@ -199,6 +199,10 @@ class Inputs(Talker):
                 inputs['freeparamnames'].append(tlabel+str(self.n))
                 inputs['freeparamvalues'].append(inputs['tranparams'][t])
 
+            inputs['whitenoise'] = float(dictionary['whitenoise'])
+            inputs['whitenoiselo'] = float(dictionary['whitenoiselo'])
+            inputs['whitenoisehi'] = float(dictionary['whitenoisehi'])
+
         dtind = int(np.where(np.array(inputs['tranlabels']) == 'dt')[0])
         inputs['t0'] = inputs['toff'] + inputs['tranparams'][dtind]
 
@@ -229,8 +233,8 @@ class Inputs(Talker):
             self.inputs['dividewhite'] = str_to_bool(dictionary['dividewhite'])
             self.inputs['ldmodel']     = str_to_bool(dictionary['ldmodel'])
             self.inputs['fullsample']  = str_to_bool(dictionary['fullsample'])
-            self.inputs['dynestypool'] = str_to_bool(dictionary['dynestypool'])
             self.inputs['makeplots']   = str_to_bool(dictionary['makeplots'])
+            if self.inputs['sysmodel'] == 'GP': self.inputs['dynestypool'] = str_to_bool(dictionary['dynestypool'])
 
         inputs['datacubepath']    = dictionary['datacubepath']
         inputs['specstretchpath'] = dictionary['specstretchpath']
