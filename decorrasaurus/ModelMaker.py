@@ -176,6 +176,8 @@ class ModelMaker(Talker):
 
         self.lcs = [self.wavebin[subdir]['lc'] for subdir in self.wavebin['subdirectories']]
         self.photnoiseest = [self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]
+        try: self.gpnoiseest = [self.wavebin[subdir]['gpnoiseest'] for subdir in self.wavebin['subdirectories']]
+        except(KeyError): self.gpnoiseest = self.photnoiseest
         self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
 
     def limbdarkconversion(self):
@@ -309,7 +311,7 @@ class ModelMaker(Talker):
             else: 
                 gp = george.GP(kernel=self.kernels[s], mean=mean_models[s], fit_mean=False, white_noise=self.whitenoise[s], fit_white_noise=True)
 
-            gp.compute(self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], self.photnoiseest[s][self.wavebin[subdir]['binnedok']])
+            gp.compute(self.wavebin[subdir]['gpregressor_arrays'].T[self.wavebin[subdir]['binnedok']], self.gpnoiseest[s][self.wavebin[subdir]['binnedok']])
 
             #print(gp.get_parameter_dict())
             #print(gp.get_parameter_bounds())

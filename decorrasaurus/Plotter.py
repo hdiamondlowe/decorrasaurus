@@ -182,10 +182,10 @@ class Plotter(Talker):
                 kernelplots['data{}'.format(s)].legend(loc='best', fontsize=13)
 
                 for k, kernelmu in enumerate(self.wavebin[subdir]['kernelmus']):
-                    normmu = kernelmu-batmanmodels[subdir]
-                    normmu -= np.mean(normmu)
+                    #normmu = kernelmu#-batmanmodels[subdir]
+                    #normmu -= np.mean(normmu)
                     #if self.wavebin[subdir]['kernellabels'][k] != 'constantkernel': normmu /= np.mean(normmu)
-                    kernelplots['kernels{}'.format(s)].plot(times, normmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k])
+                    kernelplots['kernels{}'.format(s)].plot(times, kernelmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k+1])
                 kernelplots['kernels{}'.format(s)].legend(loc='best', fontsize=13)
 
                 kernelplots['residuals{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']] -models[subdir], 'k.', alpha=0.5)
@@ -394,9 +394,9 @@ class Plotter(Talker):
 
                 for k, kernelmu in enumerate(self.wavebin[subdir]['kernelmus']):
                     normmu = kernelmu-batmanmodels[subdir]
-                    normmu -= np.mean(normmu)
+                    #normmu -= np.mean(normmu)
                     #if self.wavebin[subdir]['kernellabels'][k] != 'constantkernel': normmu /= np.mean(normmu)
-                    kernelplots['kernels{}'.format(s)].plot(times, normmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k])
+                    kernelplots['kernels{}'.format(s)].plot(times, normmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k+1])
                 kernelplots['kernels{}'.format(s)].legend(loc='best', fontsize=13)
 
                 kernelplots['residuals{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]-models[subdir], 'k.', alpha=0.5)

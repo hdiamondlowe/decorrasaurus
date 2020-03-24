@@ -76,6 +76,9 @@ class LMFitter(Talker, Writer):
             self.photnoiseest = [self.wavebin[subdir]['photnoiseest'] for subdir in self.wavebin['subdirectories']]
             self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
 
+            for s, subdir in enumerate(self.wavebin['subdirectories']):
+                self.wavebin[subdir]['gpnoiseest'] = self.photnoiseest[s]
+
         self.rangeofdirectories = range(len(self.wavebin['subdirectories']))
 
         firstdir = self.wavebin['subdirectories'][0]
@@ -129,6 +132,7 @@ class LMFitter(Talker, Writer):
                     regressor_arrays.append(regressor_array)
                     regressor_array_range = 3*(regressor_array.max() - regressor_array.min())
                     regressor_array_spacing = np.abs(np.median(np.diff(regressor_array)))
+                    if regressor_array_spacing == 0: regressor_array_spacing = 0.001
 
                     #boundlo = np.log(1/regressor_array_range)
                     #boundhi = np.log(1/regressor_array_spacing)
@@ -136,14 +140,22 @@ class LMFitter(Talker, Writer):
                     #metric = 1/np.exp(log_inverse_length_scale)
                     #log_inverse_length_scale = 1/(regressor_array.max() - regressor_array.min())
                     #metric = log_inverse_length_scale
+                    
                     # do the simplest bounding possible
                     boundlo = np.log(regressor_array_spacing)
                     boundhi = np.log(regressor_array_range)
                     totalrange = regressor_array_range - regressor_array_spacing
-                    metric = regressor_array_spacing + 0.2*totalrange
+                    metric = regressor_array_spacing + 0.75*totalrange
+                    
+                    #big bounds; recommended by Nestor; refined with some testing
+                    #boundlo = np.log(1e-3)
+                    #boundhi = np.log(1e2)
+                    #metric = 10
 
                     if kerneltype == 'ExpSquaredKernel':
                         k = kernels.ExpSquaredKernel(metric, ndim=nregressors, axes=i)
+                    if kerneltype == 'Matern32Kernel':
+                        k = kernels.Matern32Kernel(metric, ndim=nregressors, axes=i)
 
                     if i == 0: fitkernel = k
                     else: fitkernel += k
@@ -351,7 +363,7 @@ class LMFitter(Talker, Writer):
 
     def runLMFitGP(self):
 
-        self.speak('running 1st minimzation for the GPs')#, making output txt file')
+        self.speak('creating the GPs and clipping outliers')#, making output txt file')
         self.wavebin['savewave'] = self.savewave
 
         # clip out transit data points
@@ -364,55 +376,25 @@ class LMFitter(Talker, Writer):
         #self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
         
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        self.gps = modelobj.makemodelGP()
+        gps = modelobj.makemodelGP()
 
-        initnames = np.hstack([self.freeparamnames[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
-        initvals = np.hstack([self.freeparamvalues[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
-        initbounds = np.vstack([self.freeparambounds.T[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
-
-        localgpparaminds = []
-        lastparamind = 0
-        for i in self.rangeofdirectories:
-            localgpparaminds.append([])
-            localgpparaminds[i] = np.arange(lastparamind, lastparamind+len(modelobj.gpparaminds[i]))
-            lastparamind += len(modelobj.gpparaminds[i])
-        # careful! this is assuming that you have whitenoise and a constant kernel in the fit!
-        #print('logpparaminds', localgpparaminds[0])
-        hyperparaminds = np.hstack([localgpparaminds[i][2:] for i in self.rangeofdirectories])
-        #print('hyperparaminds', hyperparaminds)
-
-        def neg_log_like(p):
-            inputs = np.array(p)
-            #inputs[hyperparaminds] = np.log(1./np.exp(inputs[hyperparaminds]))
-            [self.gps[i].set_parameter_vector(inputs[localgpparaminds[i]]) for i in self.rangeofdirectories]
-            neg_log_likes = np.array([-self.gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
-            if np.any(neg_log_likes == np.inf):
-                infinites = np.argwhere(neg_log_likes == np.inf)[0]
-                neg_log_likes[infinites] = 1e25
-            return np.sum(neg_log_likes)
-
-        def grad_neg_log_like(p):
-            inputs = np.array(p)
-            #inputs[hyperparaminds] = np.log(1./np.exp(inputs[hyperparaminds]))
-            [self.gps[i].set_parameter_vector(inputs[localgpparaminds[i]]) for i in self.rangeofdirectories]
-            #if len(self.rangeofdirectories) > 1:
-            grad_neg_log_likes = np.hstack([-self.gps[i].grad_lnlikelihood(self.lcs[i][self.binnedok[i]], quiet=True) for i in self.rangeofdirectories]) # should return same number of values as gpparaminds; this will not work if diff. numbers of kernels.....
-            #else: grad_neg_log_likes = -self.gps[0].grad_lnlikelihood(self.lcs[0][self.binnedok[0]], quiet=True)
-            return grad_neg_log_likes
-
-        self.lmfit1 = minimize(neg_log_like, initvals, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
+        #self.lmfit1 = minimize(neg_log_like, initvals, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
         #self.lmfit1 = minimize(neg_log_like, initvals, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
 
-        lmfitparamvals1 = self.lmfit1.x
+        #lmfitparamvals1 = self.lmfit1.x
         #lmfitparamvals1[hyperparaminds] = np.log(1./np.exp(lmfitparamvals1[hyperparaminds]))
-        lmfituncs1 = np.sqrt(np.diagonal(self.lmfit1.hess_inv*np.identity(len(self.lmfit1.x))))
-        self.write('params from 1st minimization:')
-        [self.write('    {0}    {1}  +/-  {2}'.format(initnames[i], lmfitparamvals1[i], lmfituncs1[i])) for i in range(len(initnames))]
+        #lmfituncs1 = np.sqrt(np.diagonal(self.lmfit1.hess_inv*np.identity(len(self.lmfit1.x))))
+        #self.write('params from 1st minimization:')
+        #[self.write('    {0}    {1}  +/-  {2}'.format(initnames[i], lmfitparamvals1[i], lmfituncs1[i])) for i in range(len(initnames))]
 
         regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.binnedok[i]] for i, s in enumerate(self.wavebin['subdirectories'])]
 
-        [self.gps[i].set_parameter_vector(np.array(lmfitparamvals1)[localgpparaminds[i]]) for i in self.rangeofdirectories]
-        models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+        #[self.gps[i].set_parameter_vector(np.array(lmfitparamvals1)[localgpparaminds[i]]) for i in self.rangeofdirectories]
+        #models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+
+        [gps[i].set_parameter_vector(self.freeparamvalues[modelobj.gpparaminds[i]]) for i in self.rangeofdirectories]
+        models = [gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+
 
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             resid = (self.lcs[s][self.binnedok[s]] - models[s]) # don't include masked points in residuals
@@ -427,7 +409,7 @@ class LMFitter(Talker, Writer):
             data_unc = scale*mad               # scale x median absolute deviation
             
             # find indices that do not meet clipping requirement
-            clippoint = (resid > (self.inputs['sigclip']*data_unc)) | (resid < (-self.inputs['sigclip']*data_unc)) # boolean array; true if point does not meet clipping requirements
+            clippoint = (resid > (self.inputs[subdir]['sigclip']*data_unc)) | (resid < (-self.inputs[subdir]['sigclip']*data_unc)) # boolean array; true if point does not meet clipping requirements
             lcnans[clippoint] = self.lcs[s][self.binnedok[s]][clippoint]
             residnans[clippoint] = resid[clippoint]
             self.wavebin[subdir]['lcclipped'] = lcnans
@@ -444,12 +426,75 @@ class LMFitter(Talker, Writer):
             self.write('clipped points for {0}: {1}'.format(subdir, clipinds))
         np.save(self.savewave, self.wavebin)
 
-        self.speak('running 2nd minimzation for the GPs')#, making output txt file')
+        self.speak('running 1st minimzation for the GPs')#, making output txt file')
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
-        self.gps = modelobj.makemodelGP()
+        gps = modelobj.makemodelGP()
+
+        initnames = np.hstack([self.freeparamnames[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
+        initvals = np.hstack([self.freeparamvalues[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
+        initbounds = np.vstack([self.freeparambounds.T[modelobj.gpparaminds[i]] for i in self.rangeofdirectories])
+
+        localgpparaminds = []
+        lastparamind = 0
+        for i in self.rangeofdirectories:
+            localgpparaminds.append([])
+            localgpparaminds[i] = np.arange(lastparamind, lastparamind+len(modelobj.gpparaminds[i]))
+            lastparamind += len(modelobj.gpparaminds[i])
+        # careful! this is assuming that you have whitenoise and a constant kernel in the fit!
+        #print('logpparaminds', localgpparaminds[0])
+        hyperparaminds = np.hstack([localgpparaminds[i][2:] for i in self.rangeofdirectories])
+        #print('hyperparaminds', hyperparaminds)
+
+        self.write('initial params:')
+        [self.write('    {0}    {1}'.format(self.freeparamnames[i], self.freeparamvalues[i])) for i in range(len(self.freeparamnames))]
+
+        def neg_log_like(p):
+            inputs = np.array(p)
+            #inputs[hyperparaminds] = np.log(1./np.exp(inputs[hyperparaminds]))
+            [gps[i].set_parameter_vector(inputs[localgpparaminds[i]]) for i in self.rangeofdirectories]
+            neg_log_likes = np.array([-gps[i].log_likelihood(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+            if np.any(neg_log_likes == np.inf):
+                infinites = np.argwhere(neg_log_likes == np.inf)[0]
+                neg_log_likes[infinites] = 1e25
+            return np.sum(neg_log_likes)
+
+        def grad_neg_log_like(p):
+            inputs = np.array(p)
+            #inputs[hyperparaminds] = np.log(1./np.exp(inputs[hyperparaminds]))
+            [gps[i].set_parameter_vector(inputs[localgpparaminds[i]]) for i in self.rangeofdirectories]
+            #if len(self.rangeofdirectories) > 1:
+            grad_neg_log_likes = np.hstack([-gps[i].grad_lnlikelihood(self.lcs[i][self.binnedok[i]], quiet=True) for i in self.rangeofdirectories]) # should return same number of values as gpparaminds; this will not work if diff. numbers of kernels.....
+            #else: grad_neg_log_likes = -self.gps[0].grad_lnlikelihood(self.lcs[0][self.binnedok[0]], quiet=True)
+            return grad_neg_log_likes
 
         #self.lmfit2 = minimize(neg_log_like, lmfitparamvals1, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
-        self.lmfit2 = minimize(neg_log_like, lmfitparamvals1, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
+        self.lmfit1 = minimize(neg_log_like, initvals, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
+
+        lmfitparamvals1 = self.lmfit1.x
+        #lmfitparamvals2[hyperparaminds] = np.log(1./np.exp(lmfitparamvals2[hyperparaminds]))
+        lmfituncs1 = np.sqrt(np.diagonal(self.lmfit1.hess_inv*np.identity(len(self.lmfit1.x))))
+        self.write('params from 1st minimization:')
+        [self.write('    {0}    {1}  +/-  {2}'.format(initnames[i], lmfitparamvals1[i], lmfituncs1[i])) for i in range(len(initnames))]
+
+        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.binnedok[i]] for i, s in enumerate(self.wavebin['subdirectories'])]
+
+        [gps[i].set_parameter_vector(np.array(lmfitparamvals1)[localgpparaminds[i]]) for i in self.rangeofdirectories]
+        models = [gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+        
+        # remake the gp but now with computed uncertainty instead of photon noise estimate
+        data_uncs = []
+        for s, subdir in enumerate(self.wavebin['subdirectories']):
+            resid = (self.lcs[s][self.binnedok[s]] - models[s])
+            data_unc = np.std(resid)
+            data_uncs.append(data_unc)
+            self.wavebin[subdir]['gpnoiseest'] = np.array([data_unc for i in self.lcs[s]])
+        self.write('lmfit2 data uncs: {0}'.format(data_uncs))
+
+        self.speak('running 2nd minimzation for the GPs')#, making output txt file')
+        modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
+        gps = modelobj.makemodelGP()
+
+        self.lmfit2 = minimize(neg_log_like, lmfitparamvals1, jac=grad_neg_log_like, method='L-BFGS-B', bounds=initbounds, options={'eps':1e-15, 'ftol':1e-15})
 
         lmfitparamvals2 = self.lmfit2.x
         #lmfitparamvals2[hyperparaminds] = np.log(1./np.exp(lmfitparamvals2[hyperparaminds]))
@@ -457,18 +502,18 @@ class LMFitter(Talker, Writer):
         self.write('params from 2nd minimization:')
         [self.write('    {0}    {1}  +/-  {2}'.format(initnames[i], lmfitparamvals2[i], lmfituncs2[i])) for i in range(len(initnames))]
 
-        regressors = [self.wavebin[s]['gpregressor_arrays'].T[self.binnedok[i]] for i, s in enumerate(self.wavebin['subdirectories'])]
-
-        [self.gps[i].set_parameter_vector(np.array(lmfitparamvals2)[localgpparaminds[i]]) for i in self.rangeofdirectories]
-        models = [self.gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
+        [gps[i].set_parameter_vector(np.array(lmfitparamvals2)[localgpparaminds[i]]) for i in self.rangeofdirectories]
+        models = [gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
         
+
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             self.wavebin[subdir]['kernelmus'] = []
-            pred, pred_var = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_var=True)
+            pred, pred_var = gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_var=True)
             self.wavebin[subdir]['model_var'] = pred_var
             
-            for kernel in self.wavebin[subdir]['kernels']:
-                mu = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=kernel)
+            for kernel in self.wavebin[subdir]['kernels'][1:]:
+                constantkernel = self.wavebin[subdir]['kernels'][0]
+                mu = gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=constantkernel*kernel)
                 self.wavebin[subdir]['kernelmus'].append(mu)
 
         resid = [(self.lcs[i][self.binnedok[i]] - models[i]) for i in self.rangeofdirectories]
@@ -480,7 +525,7 @@ class LMFitter(Talker, Writer):
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
 
-        finallmfitvalues = np.array(self.freeparamvalues)
+        finallmfitvalues = deepcopy(self.freeparamvalues)
         for i in self.rangeofdirectories: finallmfitvalues[modelobj.gpparaminds[i]] = lmfitparamvals2[localgpparaminds[i]]
 
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))

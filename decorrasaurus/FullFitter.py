@@ -61,7 +61,7 @@ class FullFitter(Talker, Writer):
 
         # limb darkening parameters were fixed in the Levenberg-Marquardt fits but now we want to fit for them
         self.freeparamnames = self.wavebin['lmfit']['freeparamnames']
-        self.freeparamvalues = self.wavebin['lmfit']['values']
+        self.freeparamvalues = self.wavebin['lmfit']['values']#['values']
         self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
 
         if self.inputs['sysmodel'] == 'linear':
@@ -81,7 +81,7 @@ class FullFitter(Talker, Writer):
             #kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
             self.freeparamnames = np.insert(self.freeparamnames, kernelind, ['u0{}'.format(self.firstn), 'u1{}'.format(self.firstn)])
             self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [self.wavebin['ldparams']['q0'], self.wavebin['ldparams']['q1']])
-            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.001, 0.999], [0.001, 0.999]], axis=1)
+            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.01, 0.99], [0.01, 0.99]], axis=1)
 
             #boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
             #boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
@@ -365,7 +365,6 @@ class FullFitter(Talker, Writer):
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         self.gps = modelobj.makemodelGP()
 
-
         #subdirs = self.wavebin['subdirectories']
         #pred, pred_var = self.gps[0].predict(self.lcs[0][self.wavebin[subdirs[0]]['binnedok']], self.wavebin[subdirs[0]]['gpregressor_arrays'].T[self.wavebin[subdirs[0]]['binnedok']], return_var=True)#, kernel=airmasskernel)
         #plt.figure('FullFitter before minimize')
@@ -516,8 +515,9 @@ class FullFitter(Talker, Writer):
             pred, pred_var = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_var=True)
             self.wavebin[subdir]['model_var'] = pred_var
             
-            for kernel in self.wavebin[subdir]['kernels']:
-                mu = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=kernel)
+            for kernel in self.wavebin[subdir]['kernels'][1:]:
+                constantkernel = self.wavebin[subdir]['kernels'][0]
+                mu = self.gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_cov=False, kernel=constantkernel*kernel)
                 self.wavebin[subdir]['kernelmus'].append(mu)
 
         resid = [(self.lcs[i][self.binnedok[i]] - models[i]) for i in self.rangeofdirectories]
