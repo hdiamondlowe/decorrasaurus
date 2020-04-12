@@ -81,11 +81,11 @@ class FullFitter(Talker, Writer):
             #kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
             self.freeparamnames = np.insert(self.freeparamnames, kernelind, ['u0{}'.format(self.firstn), 'u1{}'.format(self.firstn)])
             self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [self.wavebin['ldparams']['q0'], self.wavebin['ldparams']['q1']])
-            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.01, 0.99], [0.01, 0.99]], axis=1)
+            #self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.01, 0.99], [0.01, 0.99]], axis=1)
 
-            #boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.01), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.99)]
-            #boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.01), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.99)]
-            #self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)            
+            boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.001), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.999)]
+            boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.001), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.999)]
+            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)            
             
         # will need these in ModelMaker
         self.wavebin['freeparamnames'] = self.freeparamnames
@@ -376,9 +376,9 @@ class FullFitter(Talker, Writer):
         # need to know limb-darkening indices; these should be Gaussian priors that are bounded between 0 and 1 (from Kipping+2013)
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
         v = np.linspace(0, 1, 100000)
-        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=3*self.wavebin['ldparams']['q0_unc'])
+        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=self.wavebin['ldparams']['q0_unc'])
         ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
-        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=3*self.wavebin['ldparams']['q1_unc'])
+        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=self.wavebin['ldparams']['q1_unc'])
         ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
         u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
         u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
@@ -455,12 +455,12 @@ class FullFitter(Talker, Writer):
                 # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
                 if x[u0ind] < 0.0001: x[u0ind] = 0.0001     
                 elif x[u0ind] > .9999: x[u0ind] = .9999
-                else: x[u0ind] = ppf_func_u0(x[u0ind])
+                x[u0ind] = ppf_func_u0(x[u0ind])
 
                 # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
                 if x[u1ind] < 0.0001: x[u1ind] = 0.0001     
                 elif x[u1ind] > .9999: x[u1ind] = .9999
-                else: x[u1ind] = ppf_func_u1(x[u1ind])
+                x[u1ind] = ppf_func_u1(x[u1ind])
 
             return x
 
@@ -525,10 +525,21 @@ class FullFitter(Talker, Writer):
         data_unc = np.std(allresid)
         self.write('lmfit overall RMS: {0}'.format(data_unc))  # this is the same as the rms!
 
+        chisq = np.sum((allresid/data_unc)**2)
+        numpoints = np.sum([len(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+        redchisq = chisq/(numpoints - len(self.freeparamnames))
+        neg2lnl = numpoints * np.log(chisq / numpoints)
+        BIC = neg2lnl + len(self.freeparamnames)*np.log(numpoints)
+        AIC = neg2lnl + 2*len(self.freeparamnames)
+
+        self.write('Reduced chi^2: {}'.format(redchisq))
+        self.write('BIC: {}'.format(BIC))
+        self.write('AIC: {}'.format(AIC))
+
         # how many times the expected noise is the rms?
         for n, subdir in enumerate(self.wavebin['subdirectories']):
-            self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']])))
-        self.write('x median mean expected noise for joint fit: {0}'.format(np.median([np.std(resid[n])/np.mean(self.wavebin[subdir]['photnoiseest'][self.wavebin[subdir]['binnedok']]) for n in range(len(self.wavebin['subdirectories']))])))
+            self.write('x mean expected noise for {0}: {1}'.format(subdir, np.std(resid[n])/np.mean(self.photnoiseest[n][self.binnedok[n]])))
+        self.write('x median mean expected noise for joint fit: {0}'.format(np.mean([np.std(resid[n])/np.mean(self.photnoiseest[n][self.binnedok[n]]) for n in self.rangeofdirectories])))
 
         # sort the fit and batman models into their subdirectories; remove the padded values from the ends of each
         fitmodel = {}

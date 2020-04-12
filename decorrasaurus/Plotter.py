@@ -244,7 +244,7 @@ class Plotter(Talker):
             plt.close()
 
         
-        self.speak('plotting fit residual histogram')
+        self.speak('plotting fit residual histogram after lmfit')
         dist = []
         for subdir in self.wavebin['subdirectories']:
             if self.inputs['sysmodel'] == 'linear': resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']]
@@ -260,7 +260,7 @@ class Plotter(Talker):
         plt.xlabel('Uncertainty-Weighted Residuals', fontsize=20)
         plt.ylabel('Number of Data Points', fontsize=20)
         plt.legend()
-        plt.savefig(self.inputs['directoryname']+self.wavefile+'_residuals_hist.png')
+        plt.savefig(self.inputs['directoryname']+self.wavefile+'_residuals_lmfithist.png')
         plt.clf()
         plt.close()
 
@@ -477,6 +477,26 @@ class Plotter(Talker):
             plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitrmsbinsize'+subdir+'.png')
             plt.clf()
             plt.close()
+
+        self.speak('plotting fit residual histogram after fullfit')
+        dist = []
+        for subdir in self.wavebin['subdirectories']:
+            if self.inputs['sysmodel'] == 'linear': resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']]
+            elif self.inputs['sysmodel'] == 'GP': resid = (self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']] - models[subdir])
+            data_unc = np.std(resid)
+            dist.append(resid/data_unc)
+        dist = np.hstack(dist)
+        
+        n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
+        gaussiandist = np.random.randn(10000)
+        ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, bins=25, normed=1, color='r', alpha=0.6, label='gaussian')
+        plt.title('Residuals for '+self.wavefile, fontsize=20)
+        plt.xlabel('Uncertainty-Weighted Residuals', fontsize=20)
+        plt.ylabel('Number of Data Points', fontsize=20)
+        plt.legend()
+        plt.savefig(self.inputs['directoryname']+self.wavefile+'_residuals_fullhist.png')
+        plt.clf()
+        plt.close()
 
 
         if self.inputs['samplecode'] == 'emcee':        

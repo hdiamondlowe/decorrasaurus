@@ -92,6 +92,8 @@ class LMFitter(Talker, Writer):
 
             for s, subdir in enumerate(self.wavebin['subdirectories']):
 
+                print(self.freeparamnames)
+
                 n = self.inputs[subdir]['n']
                 nregressors = len(self.inputs[subdir]['fitlabels'])
 
@@ -99,15 +101,27 @@ class LMFitter(Talker, Writer):
                 whitenoiseboundlo, whitenoiseboundhi = np.log((self.inputs[subdir]['whitenoiselo']*1e-6)**2), np.log((self.inputs[subdir]['whitenoisehi']*1e-6)**2)
 
                 constantkernelvalue = np.log(np.var(self.lcs[s]))
-                constantkernelboundlo, constantkernelboundhi = np.log(0.005*np.var(self.lcs[s])), np.log(100*np.var(self.lcs[s]))
+                constantkernelboundlo, constantkernelboundhi = np.log(0.001*np.var(self.lcs[s])), np.log(1000*np.var(self.lcs[s]))
                 constantkernel = kernels.ConstantKernel(constantkernelvalue, ndim=nregressors, axes=range(nregressors))
 
                 self.wavebin[subdir]['kernellabels'] = ['constantkernel']
                 self.wavebin[subdir]['kernels'] = [constantkernel]
 
                 endswithn = [freeparam.endswith(n) for freeparam in self.freeparamnames]
+                print(endswithn)
                 if np.any(endswithn):
+                    if (len(self.rangeofdirectories) > 10) and (s < 10):
+                        endswithninds = np.array(np.where(endswithn)).flatten()
+                        for ind in endswithninds:
+                            potentialfreeparam = self.freeparamnames[ind]
+                            print(potentialfreeparam)
+                            try: 
+                                lasttwo = int(potentialfreeparam[-2:]) # will work for up to 100 data sets
+                                endswithn[ind] = False
+                            except(ValueError): continue
+                    print(endswithn)
                     endswithninds = np.array(np.where(endswithn)).flatten()
+                    print(endswithninds)
                     lastn = endswithninds[-1]
                     insertn = lastn+1
                 else: insertn = len(self.freeparamnames)-1
@@ -142,15 +156,15 @@ class LMFitter(Talker, Writer):
                     #metric = log_inverse_length_scale
                     
                     # do the simplest bounding possible
-                    boundlo = np.log(regressor_array_spacing)
-                    boundhi = np.log(regressor_array_range)
-                    totalrange = regressor_array_range - regressor_array_spacing
-                    metric = regressor_array_spacing + 0.75*totalrange
+                    #boundlo = np.log(regressor_array_spacing)
+                    #boundhi = np.log(regressor_array_range)
+                    #totalrange = regressor_array_range - regressor_array_spacing
+                    #metric = regressor_array_spacing + 0.75*totalrange
                     
                     #big bounds; recommended by Nestor; refined with some testing
-                    #boundlo = np.log(1e-3)
-                    #boundhi = np.log(1e2)
-                    #metric = 10
+                    boundlo = np.log(1e-2)
+                    boundhi = np.log(1e5)
+                    metric = 1
 
                     if kerneltype == 'ExpSquaredKernel':
                         k = kernels.ExpSquaredKernel(metric, ndim=nregressors, axes=i)
@@ -214,12 +228,12 @@ class LMFitter(Talker, Writer):
 
         ######### do a second fit with priors, now that you know what the initial scatter is ########
         
-        self.speak('running second lmfit after clipping >{0} sigma points'.format(self.inputs['sigclip']))
- 
-        # median absolute deviation sigma clipping to specified sigma value from inputs
+       # median absolute deviation sigma clipping to specified sigma value from inp uts
         modelobj = ModelMaker(self.detrender.inputs, self.wavebin)
         models = modelobj.makemodelLinear(np.array(linfit1paramvals))
         for s, subdir in enumerate(self.wavebin['subdirectories']):
+            self.speak('running second lmfit after clipping >{0} sigma points'.format(self.inputs[subdir]['sigclip']))
+
             resid = (self.lcs[s] - models[s])[self.binnedok[s]] # don't include masked points in residuals
 
             # median absolute deviation
@@ -228,7 +242,7 @@ class LMFitter(Talker, Writer):
             data_unc = scale*mad               # scale x median absolute deviation
             
             # find indices that do not meet clipping requirement
-            clippoint = (resid > (self.inputs['sigclip']*data_unc)) | (resid < (-self.inputs['sigclip']*data_unc)) # boolean array; true if point does not meet clipping requirements
+            clippoint = (resid > (self.inputs[subdir]['sigclip']*data_unc)) | (resid < (-self.inputs[subdir]['sigclip']*data_unc)) # boolean array; true if point does not meet clipping requirements
             #print('clippoint', clippoint)
             
             # remake 'binnedok'
@@ -263,7 +277,7 @@ class LMFitter(Talker, Writer):
 
         ######### do a third fit, now with calculated uncertainties ########
         
-        self.speak('running third lmfit after calculating undertainties from the data'.format(self.inputs['sigclip']))
+        self.speak('running third lmfit after calculating undertainties from the data')
  
         lmfitparams = lmfit.Parameters()
         for n, name in enumerate(self.freeparamnames):
@@ -325,7 +339,7 @@ class LMFitter(Talker, Writer):
         # make BIC,AIC calculations
         for subdir in self.wavebin['subdirectories']:
             # use linfit2 where uncertainty was taken from photon noise estimate (does not vary with fit)
-            self.write('Model statistics for {0}: BIC = {1}, AIC = {2}'.format(subdir, self.linfit2.bic, self.linfit2.aic))
+            self.write('Model statistics for {0}: BIC = {1}, AIC = {2}'.format(subdir, self.linfit3.bic, self.linfit3.aic))
 
         self.speak('saving lmfit to wavelength bin {0}'.format(self.wavefile))
         self.wavebin['lmfit'] = {}
@@ -505,7 +519,6 @@ class LMFitter(Talker, Writer):
         [gps[i].set_parameter_vector(np.array(lmfitparamvals2)[localgpparaminds[i]]) for i in self.rangeofdirectories]
         models = [gps[i].predict(self.lcs[i][self.binnedok[i]], regressors[i], return_cov=False) for i in self.rangeofdirectories]
         
-
         for s, subdir in enumerate(self.wavebin['subdirectories']):
             self.wavebin[subdir]['kernelmus'] = []
             pred, pred_var = gps[s].predict(self.lcs[s][self.binnedok[s]], regressors[s], return_var=True)
@@ -520,6 +533,17 @@ class LMFitter(Talker, Writer):
         allresid = np.hstack(resid)
         data_unc = np.std(allresid)
         self.write('lmfit overall RMS: {0}'.format(data_unc))  # this is the same as the rms!
+
+        chisq = np.sum((allresid/data_unc)**2)
+        numpoints = np.sum([len(self.lcs[i][self.binnedok[i]]) for i in self.rangeofdirectories])
+        redchisq = chisq/(numpoints - len(initvals))
+        neg2lnl = numpoints * np.log(chisq / numpoints)
+        BIC = neg2lnl + len(initvals)*np.log(numpoints)
+        AIC = neg2lnl + 2*len(initvals)
+
+        self.write('Reduced chi^2: {}'.format(redchisq))
+        self.write('BIC: {}'.format(BIC))
+        self.write('AIC: {}'.format(AIC))
 
         # how many times the expected noise is the rms?
         for n, subdir in enumerate(self.wavebin['subdirectories']):
