@@ -62,10 +62,10 @@ class RunReader(Talker, Writer):
         self.results['allparamnames'] = []
 
         self.results['ldparams'] = {}
-        self.results['ldparams']['v0'] = []
-        self.results['ldparams']['v1'] = []
-        self.results['ldparams']['v0_unc'] = []
-        self.results['ldparams']['v1_unc'] = []
+        self.results['ldparams']['q0'] = []
+        self.results['ldparams']['q1'] = []
+        self.results['ldparams']['q0_unc'] = []
+        self.results['ldparams']['q1_unc'] = []
 
         self.results['subwavelims'] = {}
         self.results['submidwave'] = {}
@@ -74,6 +74,7 @@ class RunReader(Talker, Writer):
         self.results['fitmodel'] = {}
         self.results['batmanmodel'] = {}
         self.results['t0'] = {}
+        self.results['t0_unc'] = {}
         self.results['photnoiseest'] = {}
 
         for wfile in self.results['allwavefiles']:
@@ -101,16 +102,22 @@ class RunReader(Talker, Writer):
                 #print(wfile, fitparam)
 
             if fit == 'lmfit':
-                self.results['ldparams']['v0'].append(wavebin['ldparams']['v0'])
-                self.results['ldparams']['v1'].append(wavebin['ldparams']['v1'])
-                self.results['ldparams']['v0_unc'].append(wavebin['ldparams']['v0_unc'])
-                self.results['ldparams']['v1_unc'].append(wavebin['ldparams']['v1_unc']) 
+                if self.inputs['sysmodel'] == 'GP':
+                    self.results['ldparams']['q0'].append(wavebin['ldparams']['q0'])
+                    self.results['ldparams']['q1'].append(wavebin['ldparams']['q1'])
+                    self.results['ldparams']['q0_unc'].append(wavebin['ldparams']['q0_unc'])
+                    self.results['ldparams']['q1_unc'].append(wavebin['ldparams']['q1_unc']) 
+                elif self.inputs['sysmodel'] == 'linear':
+                    self.results['ldparams']['q0'].append(wavebin['ldparams']['q0'])
+                    self.results['ldparams']['q1'].append(wavebin['ldparams']['q1'])
+                    self.results['ldparams']['q0_unc'].append(wavebin['ldparams']['q0_unc'])
+                    self.results['ldparams']['q1_unc'].append(wavebin['ldparams']['q1_unc']) 
             elif fit == 'mcfit':
                 i = np.argwhere(wavebin['freeparamnames'] == 'u0'+firstn)[0][0]
-                self.results['ldparams']['v0'].append(wavebin[fit]['values'][i])
-                self.results['ldparams']['v1'].append(wavebin[fit]['values'][i+1])
-                self.results['ldparams']['v0_unc'].append(np.mean(wavebin[fit]['uncs'][i]))
-                self.results['ldparams']['v1_unc'].append(np.mean(wavebin[fit]['uncs'][i+1]))
+                self.results['ldparams']['q0'].append(wavebin[fit]['values'][i])
+                self.results['ldparams']['q1'].append(wavebin[fit]['values'][i+1])
+                self.results['ldparams']['q0_unc'].append(np.mean(wavebin[fit]['uncs'][i]))
+                self.results['ldparams']['q1_unc'].append(np.mean(wavebin[fit]['uncs'][i+1]))
 
             for subdir in wavebin['subdirectories']:
                 self.results['subwavelims'].setdefault(subdir,[]).append(wavebin['wavelims'])
@@ -124,6 +131,7 @@ class RunReader(Talker, Writer):
                 if 'dt'+self.inputs[subdir]['n'] in wavebin[fit]['freeparamnames']:
                     dtind = np.argwhere(np.array(wavebin[fit]['freeparamnames']) == 'dt'+self.inputs[subdir]['n'])[0][0]
                     self.results['t0'].setdefault(subdir, []).append(self.inputs[subdir]['toff'] + wavebin[fit]['values'][dtind])
+                    self.results['t0_unc'].setdefault(subdir, []).append(wavebin[fit]['uncs'][dtind])
                 else:
                     dtind = np.argwhere(np.array(self.inputs[subdir]['tranlabels']) == 'dt')[0][0]
                     self.results['t0'].setdefault(subdir, []).append(self.inputs[subdir]['toff'] + self.inputs[subdir]['tranparams'][dtind])

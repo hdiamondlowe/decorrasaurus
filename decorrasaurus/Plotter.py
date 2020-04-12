@@ -7,6 +7,7 @@ from dynesty import plotting as dyplot
 class Plotter(Talker):
 
     '''this class will plot all the things you wish to see'''
+    # Really need to fix this so that fuctions aren't repeated between lmfit and fullfitter; it's real messy now...
 
     def __init__(self, inputs, subcube):
         ''' initialize the plotter 
@@ -64,24 +65,25 @@ class Plotter(Talker):
                 plt.clf()
                 plt.close()
 
-        self.speak('plotting fit parameters')
-        for subdir in self.wavebin['subdirectories']:
-            for f in self.inputs[subdir]['fitlabels']:
-                plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['compcube'][f][self.wavebin[subdir]['binnedok']], alpha=0.7, label=f+str(self.inputs[subdir]['n']))
-            polymodel = 0
-            for p in range(self.inputs[subdir]['polyfit']):
-                polymodel += ((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])**p           
-            if self.inputs[subdir]['polyfit'] > 0: plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], polymodel, label='polyfit deg'+str(self.inputs[subdir]['polyfit']))
-            plt.legend(loc='best')
-            plt.xlabel('BJD')
-            plt.ylabel('Parameter')
-            plt.title(subdir+', '+self.wavefile+', decorrelation parameters')
-            plt.tight_layout()
-            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_decorrelationparams_'+subdir+'.png')
-            plt.clf()
-            plt.close()
+        if self.inputs['sysmodel'] == 'linear':
+            self.speak('plotting fit parameters')
+            for subdir in self.wavebin['subdirectories']:
+                for f in self.inputs[subdir]['fitlabels']:
+                    plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], self.wavebin[subdir]['compcube'][f][self.wavebin[subdir]['binnedok']], alpha=0.7, label=f+str(self.inputs[subdir]['n']))
+                polymodel = 0
+                for p in range(self.inputs[subdir]['polyfit']):
+                    polymodel += ((self.wavebin[subdir]['compcube']['bjd'] - self.inputs[subdir]['toff'])[self.wavebin[subdir]['binnedok']])**p           
+                if self.inputs[subdir]['polyfit'] > 0: plt.plot(self.wavebin[subdir]['compcube']['bjd'][self.wavebin[subdir]['binnedok']], polymodel, label='polyfit deg'+str(self.inputs[subdir]['polyfit']))
+                plt.legend(loc='best')
+                plt.xlabel('BJD')
+                plt.ylabel('Parameter')
+                plt.title(subdir+', '+self.wavefile+', decorrelation parameters')
+                plt.tight_layout()
+                plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_decorrelationparams_'+subdir+'.png')
+                plt.clf()
+                plt.close()
         
-    def lmplots(self, wavebin, linfits):
+    def lmplots(self, wavebin, *linfits):
 
         self.wavebin = wavebin
         self.wavefile = str(self.wavebin['wavelims'][0])+'-'+str(self.wavebin['wavelims'][1])
@@ -139,30 +141,64 @@ class Plotter(Talker):
                     plt.close()
 
         self.speak('making lightcurve and lmfit model vs time figure')
-        for n, subdir in enumerate(self.wavebin['subdirectories']):
-            plt.figure(figsize=(12, 14))
-            gs = plt.matplotlib.gridspec.GridSpec(3, 1, hspace=0.15, wspace=0.15, left=0.08,right=0.98, bottom=0.07, top=0.92)
-            lcplots = {}
-            lcplots.setdefault('lcplusmodel', []).append(plt.subplot(gs[0:2,0]))
-            lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
+        if self.inputs['sysmodel'] == 'linear':
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.figure(figsize=(12, 14))
+                gs = plt.matplotlib.gridspec.GridSpec(3, 1, hspace=0.15, wspace=0.15, left=0.08,right=0.98, bottom=0.07, top=0.92)
+                lcplots = {}
+                lcplots.setdefault('lcplusmodel', []).append(plt.subplot(gs[0:2,0]))
+                lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
 
-            # plot the points that were used in the fit
-            lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
-            # plot the points that were not used
-            #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
-            #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
-            lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
-            lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=16)
-    
-            lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
-            #lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
-            lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
-            lcplots['residuals'][0].set_xlabel('BJD-{}'.format(t0[n]), fontsize=16)
-            lcplots['residuals'][0].set_ylabel('Residuals', fontsize=16)
+                # plot the points that were used in the fit
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
+                lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=16)
+        
+                lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+                lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
+                lcplots['residuals'][0].set_xlabel('BJD-{}'.format(t0[n]), fontsize=16)
+                lcplots['residuals'][0].set_ylabel('Residuals', fontsize=16)
             plt.suptitle(subdir+', lightcurve plus lmfit model, '+self.wavefile+' angstroms', fontsize=20)
             plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_lmfitlcplusmodel_'+subdir+'.png')
             plt.clf()
             plt.close()
+        elif self.inputs['sysmodel'] == 'GP':
+            plt.figure(figsize=(17, 15))
+            gs = plt.matplotlib.gridspec.GridSpec(5, len(self.wavebin['subdirectories']), hspace=0.15, wspace=0.15, left=0.08,right=0.98, bottom=0.07, top=0.92)
+            kernelplots = {}
+            for s, subdir in enumerate(self.wavebin['subdirectories']):
+                kernelplots['data{}'.format(s)] = plt.subplot(gs[0:2,s])
+                kernelplots['kernels{}'.format(s)] = plt.subplot(gs[2:4,s])
+                kernelplots['residuals{}'.format(s)] = plt.subplot(gs[4,s])
+
+                times = self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[s]
+                pred_var = self.wavebin[subdir]['model_var']
+
+                kernelplots['data{}'.format(s)].fill_between(times, models[subdir] - np.sqrt(pred_var), models[subdir] + np.sqrt(pred_var), color='C0', alpha=0.2)
+                kernelplots['data{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'k.', alpha=0.5, label=subdir)
+                kernelplots['data{}'.format(s)].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedokunclipped']]-t0[s], self.wavebin[subdir]['lcclipped'], 'o', color='C3', alpha=0.5)
+                #kernelplots['data{}'.format(s)].plot(times, fitmodels[subdir], lw=3, color='k', alpha=0.6)
+                kernelplots['data{}'.format(s)].plot(times, models[subdir], lw=3, color='C0'.format(s), alpha=0.6)
+                kernelplots['data{}'.format(s)].legend(loc='best', fontsize=13)
+
+                for k, kernelmu in enumerate(self.wavebin[subdir]['kernelmus']):
+                    #normmu = kernelmu#-batmanmodels[subdir]
+                    #normmu -= np.mean(normmu)
+                    #if self.wavebin[subdir]['kernellabels'][k] != 'constantkernel': normmu /= np.mean(normmu)
+                    kernelplots['kernels{}'.format(s)].plot(times, kernelmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k+1])
+                kernelplots['kernels{}'.format(s)].legend(loc='best', fontsize=13)
+
+                kernelplots['residuals{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']] -models[subdir], 'k.', alpha=0.5)
+                kernelplots['residuals{}'.format(s)].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedokunclipped']]-t0[s], self.wavebin[subdir]['residclipped'], 'o', color='C3', alpha=0.5)
+                kernelplots['residuals{}'.format(s)].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.4)
+                kernelplots['residuals{}'.format(s)].set_xlabel('BJD-{}'.format(t0[n]), fontsize=16)
+                kernelplots['residuals{}'.format(s)].set_ylabel('Residuals', fontsize=16)
+
+            plt.suptitle('LMFit kernel inspection '+self.wavefile+' angstroms', fontsize=20)
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_lmfitkernels.png')
+            plt.clf()
+            plt.close()
+
 
         if self.inputs['dividewhite'] and self.inputs['binlen']!='all':
             self.speak('plotting divide white lmfit detrended lightcurve with batman model vs time')
@@ -178,7 +214,7 @@ class Plotter(Talker):
             plt.savefig(self.inputs.saveas+self.wavefile+'_figure_lmfitdetrendedlc.png')
             plt.clf()
             plt.close()
-        else:
+        elif self.inputs['sysmodel'] == 'linear':
             self.speak('plotting lmfit detrended lightcurve with batman model vs time')
             plt.figure()
             for n, subdir in enumerate(self.wavebin['subdirectories']):
@@ -187,19 +223,36 @@ class Plotter(Talker):
                 plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], batmanmodels[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
             plt.xlabel('time from mid-transit [days]', fontsize=20)
             plt.ylabel('normalized flux', fontsize=20)
-            plt.title('lmfit for fit, '+self.wavefile+' angstroms', fontsize=20)
+            plt.title('LMFit for, '+self.wavefile+' angstroms', fontsize=20)
             plt.tight_layout()
             plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_lmfitdetrendedlc.png')
             plt.clf()
             plt.close()
+        elif self.inputs['sysmodel'] == 'GP':
+            self.speak('plotting lmfit detrended lightcurve with batman model vs time')
+            plt.figure()
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']])/fitmodels[subdir], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], batmanmodels[subdir], 'k-', lw=2, alpha=0.5)
+            plt.xlabel('time from mid-transit [days]', fontsize=20)
+            plt.ylabel('normalized flux', fontsize=20)
+            plt.title('LMFit for, '+self.wavefile+' angstroms', fontsize=20)
+            plt.tight_layout()
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_lmfitdetrendedlc.png')
+            plt.clf()
+            plt.close()
+
         
-        self.speak('plotting fit residual histogram')
+        self.speak('plotting fit residual histogram after lmfit')
         dist = []
         for subdir in self.wavebin['subdirectories']:
-            resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']]
+            if self.inputs['sysmodel'] == 'linear': resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']]
+            elif self.inputs['sysmodel'] == 'GP': resid = (self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']] - models[subdir])
             data_unc = np.std(resid)
             dist.append(resid/data_unc)
         dist = np.hstack(dist)
+        
         n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
         gaussiandist = np.random.randn(10000)
         ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, bins=25, normed=1, color='r', alpha=0.6, label='gaussian')
@@ -207,25 +260,28 @@ class Plotter(Talker):
         plt.xlabel('Uncertainty-Weighted Residuals', fontsize=20)
         plt.ylabel('Number of Data Points', fontsize=20)
         plt.legend()
-        plt.savefig(self.inputs['directoryname']+self.wavefile+'_residuals_hist.png')
+        plt.savefig(self.inputs['directoryname']+self.wavefile+'_residuals_lmfithist.png')
         plt.clf()
         plt.close()
 
-        self.speak('making lmfit residuals plot for each lmfit call')
-        for i, linfit in enumerate(linfits):
-            plt.plot(range(len(linfit.residual)), linfit.residual, '.', alpha=.6, label='linfit'+str(i)+', chi2 = '+str(linfit.chisqr))
-        plt.xlabel('Data Number')
-        plt.ylabel('Residuals')
-        plt.legend(loc='best')
-        plt.savefig(self.inputs['directoryname']+self.wavefile+'_linfit_residuals.png')
-        plt.clf()
-        plt.close()
-        
+        if self.inputs['sysmodel'] == 'linear':
+            self.speak('making lmfit residuals plot for each lmfit call')
+            for i, linfit in enumerate(linfits):
+                plt.plot(range(len(linfit.residual)), linfit.residual, '.', alpha=.6, label='linfit'+str(i)+', chi2 = '+str(linfit.chisqr))
+            plt.xlabel('Data Number')
+            plt.ylabel('Residuals')
+            plt.legend(loc='best')
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_linfit_residuals.png')
+            plt.clf()
+            plt.close()
+
+        '''
         self.speak('making rms vs binsize figure after lmfit')
         for n, subdir in enumerate(self.wavebin['subdirectories']):
             time = (self.subcube[subdir]['bjd'] - t0[n])[self.wavebin[subdir]['binnedok']]     # days
             time = time*24.*60.                       # time now in minutes
-            sigma_resid = np.std((self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']])
+            if self.inputs['sysmodel'] == 'linear': sigma_resid = np.std((self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']])
+            elif self.inputs['sysmodel'] == 'GP': sigma_resid = np.std(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]-models[subdir])
             numbins = 1
             bins = []
             rms = []
@@ -238,7 +294,8 @@ class Plotter(Talker):
                     indlow = 0
                     num = 0
                     for i in ind_bins:
-                        num += np.power((np.mean(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']][indlow:indlow+i] - models[subdir][self.wavebin[subdir]['binnedok']][indlow:indlow+i])), 2.)
+                        if self.inputs['sysmodel'] == 'linear': num += np.power((np.mean(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']][indlow:indlow+i] - models[subdir][self.wavebin[subdir]['binnedok']][indlow:indlow+i])), 2.)
+                        elif self.inputs['sysmodel'] == 'GP': num += np.power((np.mean(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']][indlow:indlow+i] - models[subdir][indlow:indlow+i])), 2.)
                         indlow += i
                     calc_rms = np.sqrt(num/numbins)
                     if np.isfinite(calc_rms) != True: 
@@ -259,7 +316,7 @@ class Plotter(Talker):
             plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_lmfitrmsbinsize'+subdir+'.png')
             plt.clf()
             plt.close()
-  
+        '''
         
         plt.close('all')
     
@@ -278,28 +335,170 @@ class Plotter(Talker):
         t0 = []
         for subdir in self.wavebin['subdirectories']:
             n = str(self.inputs[subdir]['n'])
-            if 'dt'+n in self.wavebin['lmfit']['freeparamnames']:
-                dtind = np.argwhere(np.array(self.wavebin['lmfit']['freeparamnames']) == 'dt'+n)[0][0]
-                t0.append(self.inputs[subdir]['toff'] + self.wavebin['lmfit']['values'][dtind])
+            if 'dt'+n in self.wavebin['mcfit']['freeparamnames']:
+                dtind = np.argwhere(np.array(self.wavebin['mcfit']['freeparamnames']) == 'dt'+n)[0][0]
+                t0.append(self.inputs[subdir]['toff'] + self.wavebin['mcfit']['values'][dtind])
             else:
                 dtind = np.argwhere(np.array(self.inputs[subdir]['tranlabels']) == 'dt')[0][0]
                 t0.append(self.inputs[subdir]['toff'] + self.inputs[subdir]['tranparams'][dtind])
 
+        self.speak('making lightcurve and full fit model vs time figure')
+        if self.inputs['sysmodel'] == 'linear':
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.figure(figsize=(12, 14))
+                gs = plt.matplotlib.gridspec.GridSpec(3, 1, hspace=0.15, wspace=0.15, left=0.08,right=0.98, bottom=0.07, top=0.92)
+                lcplots = {}
+                lcplots.setdefault('lcplusmodel', []).append(plt.subplot(gs[0:2,0]))
+                lcplots.setdefault('residuals', []).append(plt.subplot(gs[2,0]))
+
+                # plot the points that were used in the fit
+                lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+                # plot the points that were not used
+                #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], self.wavebin['lc'][n][np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+                #lcplots['lcplusmodel'][0].plot(self.subcube[n]['bjd']-t0[n], models[n], 'k-', lw=2, alpha=0.5)
+                if self.inputs['sysmodel'] == 'linear': lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2, alpha=0.5)
+                elif self.inputs['sysmodel'] == 'GP': 
+                    lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], models[subdir], 'k-', lw=2, alpha=0.5)
+                    lcplots['lcplusmodel'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], fitmodels[subdir], 'k-', lw=2, alpha=0.5)
+                lcplots['lcplusmodel'][0].set_ylabel('lightcurve + model', fontsize=16)
+        
+                if self.inputs['sysmodel'] == 'linear': lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+                elif self.inputs['sysmodel'] == 'GP': lcplots['residuals'][0].plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]-models[subdir], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+
+
+                #lcplots['residuals'][0].plot(self.subcube[n]['bjd'][np.invert(self.wavebin['binnedok'][n])]-t0[n], (self.wavebin['lc'][n]-models[n])[np.invert(self.wavebin['binnedok'][n])], 'ko', markeredgecolor='none', alpha=0.2)
+                lcplots['residuals'][0].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.5)
+                lcplots['residuals'][0].set_xlabel('BJD-{}'.format(t0[n]), fontsize=16)
+                lcplots['residuals'][0].set_ylabel('Residuals', fontsize=16)
+                plt.suptitle(subdir+', lightcurve plus fullfit model, '+self.wavefile+' angstroms', fontsize=20)
+                plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitlcplusmodel_'+subdir+'.png')
+                plt.clf()
+                plt.close()
+        elif self.inputs['sysmodel'] == 'GP':
+            plt.figure(figsize=(17, 15))
+            gs = plt.matplotlib.gridspec.GridSpec(5, len(self.wavebin['subdirectories']), hspace=0.15, wspace=0.15, left=0.08,right=0.98, bottom=0.07, top=0.92)
+            kernelplots = {}
+            for s, subdir in enumerate(self.wavebin['subdirectories']):
+                kernelplots['data{}'.format(s)] = plt.subplot(gs[0:2,s])
+                kernelplots['kernels{}'.format(s)] = plt.subplot(gs[2:4,s])
+                kernelplots['residuals{}'.format(s)] = plt.subplot(gs[4,s])
+
+                times = self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[s]
+                pred_var = self.wavebin[subdir]['model_var']
+
+                kernelplots['data{}'.format(s)].fill_between(times, models[subdir] - np.sqrt(pred_var), models[subdir] + np.sqrt(pred_var), color='C0', alpha=0.2)
+                kernelplots['data{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']], 'k.', alpha=0.5, label=subdir)
+                kernelplots['data{}'.format(s)].plot(times, fitmodels[subdir], lw=3, color='k', alpha=0.6)
+                kernelplots['data{}'.format(s)].plot(times, models[subdir], lw=3, color='C0', alpha=0.6)
+                kernelplots['data{}'.format(s)].legend(loc='best', fontsize=13)
+
+                for k, kernelmu in enumerate(self.wavebin[subdir]['kernelmus']):
+                    normmu = kernelmu-batmanmodels[subdir]
+                    #normmu -= np.mean(normmu)
+                    #if self.wavebin[subdir]['kernellabels'][k] != 'constantkernel': normmu /= np.mean(normmu)
+                    kernelplots['kernels{}'.format(s)].plot(times, normmu, lw=2, alpha=0.6, label=self.wavebin[subdir]['kernellabels'][k+1])
+                kernelplots['kernels{}'.format(s)].legend(loc='best', fontsize=13)
+
+                kernelplots['residuals{}'.format(s)].plot(times, self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]-models[subdir], 'k.', alpha=0.5)
+                kernelplots['residuals{}'.format(s)].axhline(0, -1, 1, color='k', linestyle='-', linewidth=2, alpha=0.4)
+                kernelplots['residuals{}'.format(s)].set_xlabel('BJD-{}'.format(t0[s]), fontsize=16)
+                kernelplots['residuals{}'.format(s)].set_ylabel('Residuals', fontsize=16)
+
+            plt.suptitle('Fullfit kernel inspection '+self.wavefile+' angstroms', fontsize=20)
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitlcplusmodel_'+subdir+'.png')
+            plt.clf()
+            plt.close()
+
         self.speak('plotting fullfit detrended lightcurve with batman model vs time')
-        plt.figure()
+        if self.inputs['sysmodel'] == 'linear':
+            plt.figure()
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], batmanmodels[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2)
+            plt.xlabel('Time from Mid-Transit (days)', fontsize=20)
+            plt.ylabel('Normalized Flux', fontsize=20)
+            plt.title('Full Fit for '+self.wavefile+' angstroms', fontsize=20)
+            plt.tight_layout()
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitdetrendedlc.png')
+            plt.clf()
+            plt.close()
+        elif self.inputs['sysmodel'] == 'GP':
+            plt.figure()
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]/fitmodels[subdir], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
+            for n, subdir in enumerate(self.wavebin['subdirectories']):
+                plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], batmanmodels[subdir], 'k-', lw=2, alpha=0.5)
+            plt.xlabel('Time from Mid-Transit (days)', fontsize=20)
+            plt.ylabel('Normalized Flux', fontsize=20)
+            plt.title('Full Fit for, '+self.wavefile+' angstroms', fontsize=20)
+            plt.tight_layout()
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitdetrendedlc.png')
+            plt.clf()
+            plt.close()
+
+        self.speak('making rms vs binsize figure after fullfit')
         for n, subdir in enumerate(self.wavebin['subdirectories']):
-            plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], (self.wavebin[subdir]['lc']/fitmodels[subdir])[self.wavebin[subdir]['binnedok']], 'o', color='C{0}'.format(n%10), markeredgecolor='none', alpha=0.5)
-        for n, subdir in enumerate(self.wavebin['subdirectories']):
-            plt.plot(self.subcube[subdir]['bjd'][self.wavebin[subdir]['binnedok']]-t0[n], batmanmodels[subdir][self.wavebin[subdir]['binnedok']], 'k-', lw=2)
-        plt.xlabel('Time from Mid-Transit (days)', fontsize=20)
-        plt.ylabel('Normalized Flux', fontsize=20)
-        plt.title('Full Fit for '+self.wavefile+' angstroms', fontsize=20)
-        plt.tight_layout()
-        plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitdetrendedlc.png')
+            time = (self.subcube[subdir]['bjd'] - t0[n])[self.wavebin[subdir]['binnedok']]     # days
+            time = time*24.*60.                       # time now in minutes
+            if self.inputs['sysmodel'] == 'linear': sigma_resid = np.std((self.wavebin[subdir]['lc']-models[subdir])[self.wavebin[subdir]['binnedok']])
+            elif self.inputs['sysmodel'] == 'GP': sigma_resid = np.std(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']]-models[subdir])
+            numbins = 1
+            bins = []
+            rms = []
+            gaussianrms = []
+            for i in range(len(time)):
+                hist = np.histogram(time, numbins)
+                ind_bins, time_bins = hist[0], hist[1]      # number of points in each bin (also helps index), bin limits in units of time [days]
+                dtime = time_bins[1]-time_bins[0]
+                if dtime < (0.5*self.inputs['Tdur']*24.*60.):
+                    indlow = 0
+                    num = 0
+                    for i in ind_bins:
+                        if self.inputs['sysmodel'] == 'linear': num += np.power((np.mean(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']][indlow:indlow+i] - models[subdir][self.wavebin[subdir]['binnedok']][indlow:indlow+i])), 2.)
+                        elif self.inputs['sysmodel'] == 'GP': num += np.power((np.mean(self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']][indlow:indlow+i] - models[subdir][indlow:indlow+i])), 2.)
+                        indlow += i
+                    calc_rms = np.sqrt(num/numbins)
+                    if np.isfinite(calc_rms) != True: 
+                        numbins +=1 
+                        continue
+                    rms.append(calc_rms)
+                    bins.append(dtime)    # bin size in units of days
+                    gaussianrms.append(sigma_resid/np.sqrt(np.mean(ind_bins)))
+                numbins += 1
+            plt.loglog(np.array(bins), gaussianrms, 'r', lw=2, label='std. err.')
+            plt.loglog(np.array(bins), rms, 'k', lw=2, label='rms')
+            plt.xlim(bins[-1], bins[0])
+            plt.xlabel('Bins (min)')
+            plt.ylabel('RMS')
+            plt.title(r'RMS vs Bin Size for {0}, {1} $\AA$'.format(subdir, self.wavefile))
+            plt.legend(loc='best')
+            plt.tight_layout()
+            plt.savefig(self.inputs['directoryname']+self.wavefile+'_figure_fullfitrmsbinsize'+subdir+'.png')
+            plt.clf()
+            plt.close()
+
+        self.speak('plotting fit residual histogram after fullfit')
+        dist = []
+        for subdir in self.wavebin['subdirectories']:
+            if self.inputs['sysmodel'] == 'linear': resid = (self.wavebin[subdir]['lc'] - models[subdir])[self.wavebin[subdir]['binnedok']]
+            elif self.inputs['sysmodel'] == 'GP': resid = (self.wavebin[subdir]['lc'][self.wavebin[subdir]['binnedok']] - models[subdir])
+            data_unc = np.std(resid)
+            dist.append(resid/data_unc)
+        dist = np.hstack(dist)
+        
+        n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
+        gaussiandist = np.random.randn(10000)
+        ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, bins=25, normed=1, color='r', alpha=0.6, label='gaussian')
+        plt.title('Residuals for '+self.wavefile, fontsize=20)
+        plt.xlabel('Uncertainty-Weighted Residuals', fontsize=20)
+        plt.ylabel('Number of Data Points', fontsize=20)
+        plt.legend()
+        plt.savefig(self.inputs['directoryname']+self.wavefile+'_residuals_fullhist.png')
         plt.clf()
         plt.close()
 
-        
+
         if self.inputs['samplecode'] == 'emcee':        
 
             self.speak('plotting walkers vs steps')
@@ -335,10 +534,11 @@ class Plotter(Talker):
 
         elif self.inputs['samplecode'] == 'dynesty':
 
-            truths = self.wavebin['lmfit']['values'][:]
-            truths.append(self.wavebin['ldparams']['v0'])
-            truths.append(self.wavebin['ldparams']['v1'])
-            for n in range(len(self.wavebin['subdirectories'])): truths.append(1)
+            truths = list(self.wavebin['lmfit']['values'][:])
+            truths.append(self.wavebin['ldparams']['q0'])
+            truths.append(self.wavebin['ldparams']['q1'])
+            if self.inputs['sysmodel'] == 'linear': 
+                for n in range(len(self.wavebin['subdirectories'])): truths.append(1)
 
             # trace plot
             self.speak('plotting dynesty trace plots')

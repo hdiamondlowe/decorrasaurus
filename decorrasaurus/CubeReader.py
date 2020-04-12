@@ -1,6 +1,7 @@
 from .imports import *
 from .Plotter import Plotter
 from copy import deepcopy
+from scipy.interpolate import UnivariateSpline
 
 class CubeReader(Talker):
     ''' Reads in all the datacubes from the local subdirectories'''
@@ -49,12 +50,11 @@ class CubeReader(Talker):
         subcube['mosasaurusok'] = deepcopy(cube['temporal']['ok'])     # (time)
         subcube['trimmedok'] = np.ones_like(subcube['mosasaurusok'])      # (time) making this ahead of time for when we trim the light curve in time (LCMaker)
         subcube['bjd'] = deepcopy(cube['temporal']['bjd'])             # (time)
-        subcube['airmass'] = deepcopy(cube['temporal']['airmass'])     # (time)
-        subcube['rotangle'] = deepcopy(cube['temporal']['rotatore'])   # (time)
-
+        subcube['wavelengths'] = cube['spectral']['wavelength']        # (wave)
         subcube['norm'] = np.ones(len(subcube['bjd']))                            # normalization constant (time)
 
-        subcube['wavelengths'] = cube['spectral']['wavelength']        # (wave)
+        subcube['airmass'] = deepcopy(cube['temporal']['airmass'])     # (time)
+        subcube['rotangle'] = deepcopy(cube['temporal']['rotatore'])   # (time)
 
         # have to re-make these dictionaries
         subcube['centroid'] = deepcopy(cube['squares']['centroid'])    # [star](time)
@@ -68,6 +68,8 @@ class CubeReader(Talker):
         subcube['dcentroid'] = deepcopy(cube['cubes']['centroid'])     # [star](time, wave)
         subcube['dwidth'] = deepcopy(cube['cubes']['width'])           # [star](time, wave)
         subcube['peak'] = deepcopy(cube['cubes']['peak'])              # [star](time, wave)
+
+        subcube['time'] = subcube['bjd'] - (self.inputs['T0'] + self.inputs['P']*self.inputs[self.subdir]['epochnum'])
 
         self.subcube[self.subdir] = subcube
 
@@ -87,15 +89,22 @@ class CubeReader(Talker):
 
         for key in self.inputs[subdir]['fitlabels']:
 
-            if key in ['airmass', 'rotangle']:
+            if key in ['airmass', 'rotangle', 'time']:
+
+                #if (key == 'airmass') and (self.inputs['sysmodel'] == 'GP'):
+                #    airmass = self.subcube[subdir][key]
+                #    spl = UnivariateSpline(np.arange(len(airmass)), airmass, k=5)
+                #    smoothedairmass = spl(np.arange(len(airmass)))
+                #    self.compcube[key] = (smoothedairmass - np.mean(smoothedairmass))/(np.std(smoothedairmass))
+
                 self.compcube[key] = (self.subcube[subdir][key] - np.mean(self.subcube[subdir][key]))/(np.std(self.subcube[subdir][key]))
 
-            if self.inputs['invvar']: 
-                self.speak('weighting by inverse variance')
-                raw_counts_comps = np.array([np.sum(self.subcube[subdir]['raw_counts'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs[subdir]['comparison']))])
-                sky_counts_comps = np.array([np.sum(self.subcube[subdir]['sky'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs[subdir]['comparison']))])
-                sig2 = raw_counts_comps + sky_counts_comps
-                den = np.sum((1./sig2), 0)
+                if self.inputs['invvar']: 
+                    self.speak('weighting by inverse variance')
+                    raw_counts_comps = np.array([np.sum(self.subcube[subdir]['raw_counts'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs[subdir]['comparison']))])
+                    sky_counts_comps = np.array([np.sum(self.subcube[subdir]['sky'][comparisons[i]] * self.subindices, 1) for i in range(len(self.inputs[subdir]['comparison']))])
+                    sig2 = raw_counts_comps + sky_counts_comps
+                    den = np.sum((1./sig2), 0)
 
             if key in ['centroid', 'width', 'median_width']:#, 'stretch', 'shift']:
                 # detrend against target or comparisons, as specified in inputs
