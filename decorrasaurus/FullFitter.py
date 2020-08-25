@@ -376,9 +376,9 @@ class FullFitter(Talker, Writer):
         # need to know limb-darkening indices; these should be Gaussian priors that are bounded between 0 and 1 (from Kipping+2013)
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
         v = np.linspace(0, 1, 100000)
-        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=self.wavebin['ldparams']['q0_unc'])
+        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=5*self.wavebin['ldparams']['q0_unc'])
         ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
-        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=self.wavebin['ldparams']['q1_unc'])
+        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=5*self.wavebin['ldparams']['q1_unc'])
         ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
         u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
         u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]

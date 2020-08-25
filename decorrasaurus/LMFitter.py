@@ -92,8 +92,6 @@ class LMFitter(Talker, Writer):
 
             for s, subdir in enumerate(self.wavebin['subdirectories']):
 
-                print(self.freeparamnames)
-
                 n = self.inputs[subdir]['n']
                 nregressors = len(self.inputs[subdir]['fitlabels'])
 
@@ -108,7 +106,6 @@ class LMFitter(Talker, Writer):
                 self.wavebin[subdir]['kernels'] = [constantkernel]
 
                 endswithn = [freeparam.endswith(n) for freeparam in self.freeparamnames]
-                print(endswithn)
                 if np.any(endswithn):
                     if (len(self.rangeofdirectories) > 10) and (s < 10):
                         endswithninds = np.array(np.where(endswithn)).flatten()
@@ -119,9 +116,7 @@ class LMFitter(Talker, Writer):
                                 lasttwo = int(potentialfreeparam[-2:]) # will work for up to 100 data sets
                                 endswithn[ind] = False
                             except(ValueError): continue
-                    print(endswithn)
                     endswithninds = np.array(np.where(endswithn)).flatten()
-                    print(endswithninds)
                     lastn = endswithninds[-1]
                     insertn = lastn+1
                 else: insertn = len(self.freeparamnames)-1
@@ -164,7 +159,7 @@ class LMFitter(Talker, Writer):
                     #big bounds; recommended by Nestor; refined with some testing
                     boundlo = np.log(1e-2)
                     boundhi = np.log(1e5)
-                    metric = 1
+                    metric = 10
 
                     if kerneltype == 'ExpSquaredKernel':
                         k = kernels.ExpSquaredKernel(metric, ndim=nregressors, axes=i)

@@ -1,0 +1,5 @@
+__pycache__
+/decrorrasaurus/__pycache__
+*.py~
+/decorrasaurus/*.py~
+.gitignore~

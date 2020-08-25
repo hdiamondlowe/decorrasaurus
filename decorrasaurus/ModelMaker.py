@@ -45,7 +45,8 @@ class ModelMaker(Talker):
 
         # transform everything into a numpy array so we can do numpy math
         self.timearrays = inputs.equalizeArrays1D(timearrays)
-        self.sysparamarrays = inputs.equalizeArrays2D(sysparamlists).T
+        try: self.sysparamarrays = inputs.equalizeArrays2D(sysparamlists).T
+        except(ValueError): self.sysparamarrays = 0
         self.polyparaminds = polyparaminds              # keep as uneven list to ensure that polynomials are correct length
         self.sysparaminds = inputs.equalizeArrays1D(sysparaminds).astype(int).T
 
@@ -250,7 +251,8 @@ class ModelMaker(Talker):
         Lpolymodels = [np.polynomial.legendre.Legendre(params[self.polyparaminds[i]])(self.timearrays[i]) for i in self.rangeofdirectories]
 
         sysmodels = np.sum(np.multiply(params[self.sysparaminds], self.sysparamarrays), axis=1)
-        self.fitmodel = np.sum([np.array(Lpolymodels).T, sysmodels, self.ones]).T
+        if len(sysmodels) > 0: self.fitmodel = np.sum([np.array(Lpolymodels).T, sysmodels, self.ones]).T
+        else: self.fitmodel = Lpolymodels
 
         # make the transit models wiht batman
         self.batmanmodel = [self.update_batman_model(self.batmanparams[i], self.batmanmodels[i], self.batmandictionaries[i], self.batmanupdatenames[i], params[self.batmanparaminds[i]]) for i in self.rangeofdirectories]
