@@ -38,12 +38,19 @@ class WaveBinner(Talker):
 
         numexps, numwave = len(self.subcube[self.subdir]['bjd']), len(self.subcube[self.subdir]['wavelengths'])
 
-        waverange = self.inputs[self.subdir]['wavelength_lims'][1] - self.inputs[self.subdir]['wavelength_lims'][0]
-        if self.inputs['binlen'] == 'all': self.binlen = waverange
-        else: self.binlen = self.inputs['binlen']
-        self.numbins = int(np.floor(waverange/self.binlen))
-        self.binlen = waverange/float(self.numbins)
-        self.wavelims[self.subdir] = [(self.inputs[self.subdir]['wavelength_lims'][0]+(i*self.binlen), self.inputs[self.subdir]['wavelength_lims'][0]+((i+1)*self.binlen)) for i in range(int(self.numbins))]
+        if self.inputs['binlen'] == 'custom':
+            wavelims = []
+            for i in range(len(self.inputs[self.subdir]['wavelength_lims'])-1):
+                wavelims.append((self.inputs[self.subdir]['wavelength_lims'][i], self.inputs[self.subdir]['wavelength_lims'][i+1]))
+            self.wavelims[self.subdir] = wavelims
+
+        else:
+            waverange = self.inputs[self.subdir]['wavelength_lims'][1] - self.inputs[self.subdir]['wavelength_lims'][0]
+            if self.inputs['binlen'] == 'all': self.binlen = waverange
+            else: self.binlen = self.inputs['binlen']
+            self.numbins = int(np.floor(waverange/self.binlen))
+            self.binlen = waverange/float(self.numbins)
+            self.wavelims[self.subdir] = [(self.inputs[self.subdir]['wavelength_lims'][0]+(i*self.binlen), self.inputs[self.subdir]['wavelength_lims'][0]+((i+1)*self.binlen)) for i in range(int(self.numbins))]
         binindices = {}
 
         for i, wavelim in enumerate(self.wavelims[self.subdir]):

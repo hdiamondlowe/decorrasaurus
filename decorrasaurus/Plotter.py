@@ -253,9 +253,9 @@ class Plotter(Talker):
             dist.append(resid/data_unc)
         dist = np.hstack(dist)
         
-        n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
-        gaussiandist = np.random.randn(10000)
-        ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, bins=25, normed=1, color='r', alpha=0.6, label='gaussian')
+        n, bins, patches = plt.hist(dist, density=1, color='b', alpha=0.6, label='residuals')
+        gaussiandist = np.random.randn(len(dist))
+        ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, density=1, color='r', alpha=0.6, label='gaussian')
         plt.title('Residuals for '+self.wavefile, fontsize=20)
         plt.xlabel('Uncertainty-Weighted Residuals', fontsize=20)
         plt.ylabel('Number of Data Points', fontsize=20)
@@ -487,9 +487,9 @@ class Plotter(Talker):
             dist.append(resid/data_unc)
         dist = np.hstack(dist)
         
-        n, bins, patches = plt.hist(dist, bins=25, normed=1, color='b', alpha=0.6, label='residuals')
-        gaussiandist = np.random.randn(10000)
-        ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, bins=25, normed=1, color='r', alpha=0.6, label='gaussian')
+        n, bins, patches = plt.hist(dist, normed=1, color='b', alpha=0.6, label='residuals')
+        gaussiandist = np.random.randn(len(dist))
+        ngauss, binsgauss, patchesgauss = plt.hist(gaussiandist, normed=1, color='r', alpha=0.6, label='gaussian')
         plt.title('Residuals for '+self.wavefile, fontsize=20)
         plt.xlabel('Uncertainty-Weighted Residuals', fontsize=20)
         plt.ylabel('Number of Data Points', fontsize=20)
@@ -535,8 +535,11 @@ class Plotter(Talker):
         elif self.inputs['samplecode'] == 'dynesty':
 
             truths = list(self.wavebin['lmfit']['values'][:])
-            truths.append(self.wavebin['ldparams']['q0'])
-            truths.append(self.wavebin['ldparams']['q1'])
+            u0ind = np.argwhere(np.array(self.inputs[self.wavebin['subdirectories'][0]]['tranlabels']) == 'u0')[0][0]
+            fit_ld = self.inputs[self.wavebin['subdirectories'][0]]['tranbounds'][0][u0ind]
+            if fit_ld:
+                truths.append(self.wavebin['ldparams']['q0'])
+                truths.append(self.wavebin['ldparams']['q1'])
             if self.inputs['sysmodel'] == 'linear': 
                 for n in range(len(self.wavebin['subdirectories'])): truths.append(1)
 

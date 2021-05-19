@@ -53,7 +53,9 @@ class ModelMaker(Talker):
         self.ones = np.ones(len(self.wavebin['subdirectories']))
 
         # set up the model for the transit parameters
-        self.calclimbdark = self.limbdarkconversion()
+        u0ind = np.argwhere(np.array(self.inputs[self.wavebin['subdirectories'][0]]['tranlabels']) == 'u0')[0][0]
+        fit_ld = self.inputs[self.wavebin['subdirectories'][0]]['tranbounds'][0][u0ind]
+        self.calclimbdark = self.limbdarkconversion(fit_ld=fit_ld)
         self.batmandictionaries = []
         self.batmanupdatenames = []
         self.batmanparaminds = []
@@ -100,7 +102,9 @@ class ModelMaker(Talker):
         self.allparaminds = []
 
         # set up the model for the transit parameters
-        self.calclimbdark = self.limbdarkconversion()
+        u0ind = np.argwhere(np.array(self.inputs[self.wavebin['subdirectories'][0]]['tranlabels']) == 'u0')[0][0]
+        fit_ld = self.inputs[self.wavebin['subdirectories'][0]]['tranbounds'][0][u0ind]
+        self.calclimbdark = self.limbdarkconversion(fit_ld=fit_ld)
         self.batmandictionaries = []
         self.batmandictionariesfit = []
         self.batmanparaminds = []
@@ -181,11 +185,15 @@ class ModelMaker(Talker):
         except(KeyError): self.gpnoiseest = self.photnoiseest
         self.binnedok = [self.wavebin[subdir]['binnedok'] for subdir in self.wavebin['subdirectories']]
 
-    def limbdarkconversion(self):
+    def limbdarkconversion(self, fit_ld=True):
 
         # convert back to u0 and u1 to make the light curve; re-parameterization from Kipping+ (2013)
 
-        if self.inputs['ldlaw'] == 'sq':
+        if not fit_ld:
+            def calc_u0u1(u0, u1):
+                return [u0, u1]
+
+        elif self.inputs['ldlaw'] == 'sq':
             def calc_u0u1(q0, q1):
                 u0 = np.sqrt(q0)*(1 - 2*q1)
                 u1 = 2*np.sqrt(q0)*q1
@@ -204,6 +212,10 @@ class ModelMaker(Talker):
                 u1 = 1 - np.sqrt(q0)
                 return [u0, u1]
 
+        elif self.inputs['ldlaw'] == 'nl':
+            def calc_u0u1(q0,q1,q2,q3):
+                return[q0,q1,q2,q3]
+
         return calc_u0u1
 
     def setup_batman_model(self, dictionary, times):
@@ -216,10 +228,14 @@ class ModelMaker(Talker):
         batmanparams.inc = dictionary['inc']                 #orbital inclination (in degrees)']
         batmanparams.ecc = dictionary['ecc']                 #eccentricity
         batmanparams.w = dictionary['omega']                        #longitude of periastron (in degrees)
-        if self.inputs['ldlaw'] == 'qd': batmanparams.limb_dark = "quadratic"        #limb darkening model
-        elif self.inputs['ldlaw'] == 'sq': batmanparams.limb_dark = "squareroot"        #limb darkening model
-        elif self.inputs['ldlaw'] == 'lg':  batmanparams.limb_dark = "logarithmic"
-        batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])                   #limb darkening coefficients
+        if self.inputs['ldlaw'] in ['qd', 'sq', 'lg']:
+            if   self.inputs['ldlaw'] == 'qd': batmanparams.limb_dark = "quadratic"        #limb darkening model
+            elif self.inputs['ldlaw'] == 'sq': batmanparams.limb_dark = "squareroot"        #limb darkening model
+            elif self.inputs['ldlaw'] == 'lg': batmanparams.limb_dark = "logarithmic"
+            batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])                   #limb darkening coefficients
+        elif self.inputs['ldlaw'] == 'nl': 
+            batmanparams.limb_dark = "nonlinear"
+            batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'], dictionary['u2'], dictionary['u3'])                   #limb darkening coefficients
 
         batmanmodel = batman.TransitModel(batmanparams, times)    #initializes model
 
@@ -238,7 +254,9 @@ class ModelMaker(Talker):
         batmanparams.ecc = dictionary['ecc']                 #eccentricity
         batmanparams.w = dictionary['omega']                 #longitude of periastron (in degrees)
         
-        batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])   #limb darkening coefficients
+        if self.inputs['ldlaw'] in ['qd', 'sq', 'lg']:
+            batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'])   #limb darkening coefficients
+        elif self.inputs['ldlaw'] == 'nl': batmanparams.u = self.calclimbdark(dictionary['u0'], dictionary['u1'], dictionary['u2'], dictionary['u3'])
 
         # now return a light curve
         return np.array(batmanmodel.light_curve(batmanparams))
@@ -265,7 +283,7 @@ class ModelMaker(Talker):
         class meanTransitModel(Model):
             parameter_names = tuple(self.paramsTransitModel)#, 'u0', 'u1')#, 'airmasscoeff', 'offset')
 
-            def __init__(self, batmandictionary, batmanmodel, batmanparams, calclimbdark, batmandictionariesfit):
+            def __init__(self, batmandictionary, batmanmodel, batmanparams, ldlaw, calclimbdark, batmandictionariesfit):
                 # inherit the __init__ class from the parent class Molde
                 Model.__init__(self, **batmandictionariesfit)
 
@@ -273,6 +291,7 @@ class ModelMaker(Talker):
                 self.batmandictionary = batmandictionary
                 self.batmanmodel = batmanmodel
                 self.batmanparams = batmanparams
+                self.ldlaw = ldlaw
                 self.calclimbdark = calclimbdark
 
             def get_value(self, t):#, batmanparams, batmanmodel):
@@ -292,17 +311,23 @@ class ModelMaker(Talker):
                 try: self.batmanparams.w = self.w
                 except(AttributeError): self.batmanparams.w = self.batmandictionary['omega']                 #longitude of periastron (in degrees)
                 
-                try: 
-                    self.batmanparams.u = self.calclimbdark(self.u0, self.u1)
-                    #print('u0, u1:', self.calclimbdark(self.u0, self.u1))
-                except(AttributeError): 
-                    self.batmanparams.u = self.calclimbdark(self.batmandictionary['u0'], self.batmandictionary['u1'])   #limb darkening coefficients
-
-
+                if self.ldlaw in ['qd', 'sq', 'lg']:
+                    try: 
+                        self.batmanparams.u = self.calclimbdark(self.u0, self.u1)
+                        #print('u0, u1:', self.calclimbdark(self.u0, self.u1))
+                    except(AttributeError): 
+                        self.batmanparams.u = self.calclimbdark(self.batmandictionary['u0'], self.batmandictionary['u1'])   #limb darkening coefficients
+                elif self.ldlaw == 'nl':
+                    try: 
+                        self.batmanparams.u = self.calclimbdark(self.u0, self.u1, self.u2, self.u3)
+                        #print('u0, u1:', self.calclimbdark(self.u0, self.u1))
+                    except(AttributeError): 
+                        self.batmanparams.u = self.calclimbdark(self.batmandictionary['u0'], self.batmandictionary['u1'], self.batmandictionary['u2'], self.batmandictionary['u3'])   #limb darkening coefficients
+ 
                 # now return a light curve
                 return self.batmanmodel.light_curve(self.batmanparams)
 
-        mean_models = [meanTransitModel(self.batmandictionaries[i], self.batmanmodels[i], self.batmanparams[i], self.calclimbdark, self.batmandictionariesfit[i]) for i in self.rangeofdirectories]
+        mean_models = [meanTransitModel(self.batmandictionaries[i], self.batmanmodels[i], self.batmanparams[i], self.inputs['ldlaw'], self.calclimbdark, self.batmandictionariesfit[i]) for i in self.rangeofdirectories]
         
 
         gps = []

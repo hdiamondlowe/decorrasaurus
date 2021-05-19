@@ -64,28 +64,43 @@ class FullFitter(Talker, Writer):
         self.freeparamvalues = self.wavebin['lmfit']['values']#['values']
         self.freeparambounds = self.wavebin['lmfit']['freeparambounds']
 
-        if self.inputs['sysmodel'] == 'linear':
-            # append u0+firstn to the free paramnames
-            self.freeparamnames = np.append(self.freeparamnames, 'u0'+self.firstn)
-            self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q0'])
-            # the 'q' versions of the limb-darkening parameters are reparameterized according to Kipping+ (2013) such that they can be uniformly sampled from [0,1]
-            self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
-            # append u1+firstn to the free paramnames
-            self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
-            self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q1'])
-            self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+        # check if limb darkening parameters should be free
+        u0ind = np.argwhere(np.array(self.inputs[firstdir]['tranlabels']) == 'u0')[0][0]
+        self.fit_ld = self.inputs[firstdir]['tranbounds'][0][u0ind]
 
-        elif self.inputs['sysmodel'] == 'GP':
+        if (self.inputs['sysmodel'] == 'linear') and self.fit_ld:
+            # append u_+firstn to the free paramnames
+            for i in range(int(len(list(self.wavebin['ldparams'].keys()))/2)):
+                self.freeparamnames = np.append(self.freeparamnames, 'u{}'.format(i)+self.firstn)
+                self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q{}'.format(i)])
+                # the 'q' versions of the limb-darkening parameters are reparameterized according to Kipping+ (2013) such that they can be uniformly sampled from [0,1]
+                self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+            # append u1+firstn to the free paramnames
+            #self.freeparamnames = np.append(self.freeparamnames, 'u1'+self.firstn)
+            #self.freeparamvalues = np.append(self.freeparamvalues, self.wavebin['ldparams']['q1'])
+            #self.freeparambounds = np.append(self.freeparambounds, [[0], [1]], axis=1)
+
+        elif self.inputs['sysmodel'] == 'GP' and self.fit_ld:
             # need to put the limb darkening coefficients in front of the kernels
             kernelind = np.where(self.freeparamnames == 'whitenoise{}'.format(self.firstn))[0][0]
             #kernelind = np.where(self.freeparamnames == 'constantkernel{}'.format(self.firstn))[0][0]
-            self.freeparamnames = np.insert(self.freeparamnames, kernelind, ['u0{}'.format(self.firstn), 'u1{}'.format(self.firstn)])
-            self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, [self.wavebin['ldparams']['q0'], self.wavebin['ldparams']['q1']])
+
+            u_names = []
+            u_values = []
+            for i in range(int(len(list(self.wavebin['ldparams'].keys()))/2)):
+                u_names.append('u{}{}'.format(i, self.firstn))
+                u_values.append(self.wavebin['ldparams']['q{}'.format(i)])
+            self.freeparamnames = np.insert(self.freeparamnames, kernelind, u_names)
+            self.freeparamvalues = np.insert(self.freeparamvalues, kernelind, u_values)
             #self.freeparambounds = np.insert(self.freeparambounds, kernelind, [[0.01, 0.99], [0.01, 0.99]], axis=1)
 
-            boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.001), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.999)]
-            boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.001), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.999)]
-            self.freeparambounds = np.insert(self.freeparambounds, kernelind, [boundsq0, boundsq1], axis=1)            
+            bounds = []
+            for i in range(int(len(list(self.wavebin['ldparams'].keys()))/2)):
+                bound = [max(self.wavebin['ldparams']['q{}'.format(i)]-5*self.wavebin['ldparams']['q{}_unc'.format(i)], 0.001), min(self.wavebin['ldparams']['q{}'.format(i)]+5*self.wavebin['ldparams']['q{}_unc'.format(i)], 0.999)]
+                bounds.append(bound)
+            #boundsq0 = [max(self.wavebin['ldparams']['q0']-5*self.wavebin['ldparams']['q0_unc'], 0.001), min(self.wavebin['ldparams']['q0']+5*self.wavebin['ldparams']['q0_unc'], 0.999)]
+            #boundsq1 = [max(self.wavebin['ldparams']['q1']-5*self.wavebin['ldparams']['q1_unc'], 0.001), min(self.wavebin['ldparams']['q1']+5*self.wavebin['ldparams']['q1_unc'], 0.999)]
+            self.freeparambounds = np.insert(self.freeparambounds, kernelind, bounds, axis=1)
             
         # will need these in ModelMaker
         self.wavebin['freeparamnames'] = self.freeparamnames
@@ -270,28 +285,44 @@ class FullFitter(Talker, Writer):
 
         # inverse transform sampling    
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
-        v = np.linspace(0, 1, 100000)
-        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=self.wavebin['ldparams']['q0_unc'])
-        ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
-        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=self.wavebin['ldparams']['q1_unc'])
-        ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
-        u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
-        u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
+        if self.fit_ld:
+            v = np.linspace(0, 1, 100000)
+            ppf_funcs = []
+            uinds = []
+            for i in range(int(len(list(self.wavebin['ldparams'].keys()))/2)):
+                ppf_u = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q{}'.format(i)], scale=self.wavebin['ldparams']['q{}_unc'.format(i)])
+                ppf_func_u = interpolate.interp1d(v, ppf_u)
+                ppf_funcs.append(ppf_func_u)
+                u_ind = np.argwhere(np.array(self.freeparamnames) == 'u{}'.format(i)+self.firstn)[0][0]
+                uinds.append(u_ind)
+            ppf_funcs = np.array(ppf_funcs)
 
         def ptform(p):
 
-            x = np.array(p)
-            x = x*span + self.mcmcbounds[0]
+            xcopy = np.array(p)
+            xnew = xcopy*span + self.mcmcbounds[0]
+
+            if self.fit_ld:
+                if np.any(xcopy[uinds] < 0.0001): 
+                    too_small = xcopy[uinds] < 0.0001
+                    xcopy[uinds][too_small] = 0.0001
+                elif np.any(xcopy[uinds] > 0.9999): 
+                    too_big = xcopy[uinds] > 0.0999
+                    xcopy[uinds][too_big] = 0.9999
+                xnew[uinds] = [f(x) for f, x in zip(ppf_funcs, xcopy[uinds])]
+                if np.any(xnew[uinds] < 0):
+                    less_than_zero = xnew[uinds] < 0
+                    xnew[uinds][less_than_zero] = np.abs(xnew[uinds][less_than_zero])
             
-            if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            if x[u0ind] > .9999: x[u0ind] = .9999
-            else: x[u0ind] = ppf_func_u0(x[u0ind])
+            #if x[u0ind] < 0.0001: x[u0ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            #if x[u0ind] > .9999: x[u0ind] = .9999
+            #else: x[u0ind] = ppf_func_u0(x[u0ind])
 
-            if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-            if x[u1ind] > .9999: x[u1ind] = .9999
-            else: x[u1ind] = ppf_func_u1(x[u1ind])
+            #if x[u1ind] < 0.0001: x[u1ind] = 0.0001     # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+            #if x[u1ind] > .9999: x[u1ind] = .9999
+            #else: x[u1ind] = ppf_func_u1(x[u1ind])
 
-            return x
+            return xnew
 
         ndim = len(self.freeparamnames)
 
@@ -375,13 +406,14 @@ class FullFitter(Talker, Writer):
 
         # need to know limb-darkening indices; these should be Gaussian priors that are bounded between 0 and 1 (from Kipping+2013)
         # calculate inverse cdf (ppf) of gaussian priors on u0 and u1; interpolations can be used to assign values in prior transform
-        v = np.linspace(0, 1, 100000)
-        ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=5*self.wavebin['ldparams']['q0_unc'])
-        ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
-        ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=5*self.wavebin['ldparams']['q1_unc'])
-        ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
-        u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
-        u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
+        if self.fit_ld:
+            v = np.linspace(0, 1, 100000)
+            ppf_u0 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q0'], scale=5*self.wavebin['ldparams']['q0_unc'])
+            ppf_func_u0 = interpolate.interp1d(v, ppf_u0)
+            ppf_u1 = stats.norm.ppf(v, loc=self.wavebin['ldparams']['q1'], scale=5*self.wavebin['ldparams']['q1_unc'])
+            ppf_func_u1 = interpolate.interp1d(v, ppf_u1)
+            u0ind = np.argwhere(np.array(self.freeparamnames) == 'u0'+self.firstn)[0][0]
+            u1ind = np.argwhere(np.array(self.freeparamnames) == 'u1'+self.firstn)[0][0]
 
         # need to know the indices that correspond to the kernel parameters; these should be log uniform priors
         whitenoiseinds, constantinds, kernelinds = [], [], []
@@ -422,8 +454,10 @@ class FullFitter(Talker, Writer):
                 pooldict['inputs'] = self.detrender.inputs
                 pooldict['wavebin'] = self.wavebin
                 pooldict['savewave'] = self.savewave
-                pooldict['u0ind'], pooldict['u1ind'] = u0ind, u1ind
-                pooldict['ppf_func_u0'], pooldict['ppf_func_u1'] = ppf_func_u0, ppf_func_u1
+                pooldict['fit_ld'] = self.fit_ld
+                if self.fit_ld:
+                    pooldict['u0ind'], pooldict['u1ind'] = u0ind, u1ind
+                    pooldict['ppf_func_u0'], pooldict['ppf_func_u1'] = ppf_func_u0, ppf_func_u1
 
                 with open(self.savewave+'_dynestypool.pkl', 'wb') as f: pickle.dump(pooldict, f)
                 self.speak('saved pool dictionary')
@@ -452,17 +486,18 @@ class FullFitter(Talker, Writer):
                 loguniformdist = [np.log(p[i]*expspan[i] + expboundslo[i]) for i in kernelinds]
                 x[kernelinds] = loguniformdist
                 
-                # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-                if x[u0ind] < 0.0001: x[u0ind] = 0.0001     
-                elif x[u0ind] > .9999: x[u0ind] = .9999
-                x[u0ind] = ppf_func_u0(x[u0ind])
+                if self.fit_ld:
+                    # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+                    if x[u0ind] < 0.0001: x[u0ind] = 0.0001     
+                    elif x[u0ind] > .9999: x[u0ind] = .9999
+                    x[u0ind] = ppf_func_u0(x[u0ind])
 
-                # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
-                if x[u1ind] < 0.0001: x[u1ind] = 0.0001     
-                elif x[u1ind] > .9999: x[u1ind] = .9999
-                x[u1ind] = ppf_func_u1(x[u1ind])
+                    # this prevents trying to interpolate a value that is beyond the bounds of the interpolation
+                    if x[u1ind] < 0.0001: x[u1ind] = 0.0001     
+                    elif x[u1ind] > .9999: x[u1ind] = .9999
+                    x[u1ind] = ppf_func_u1(x[u1ind])
 
-            return x
+                return x
 
             if ndim > 20: # use special inputs that will make run more efficient; slice sampling will automatically be chosen 
                 self.dsampler = dynesty.DynamicNestedSampler(lnlike, ptform, ndim=ndim)

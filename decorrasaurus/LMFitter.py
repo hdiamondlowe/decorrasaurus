@@ -40,13 +40,37 @@ class LMFitter(Talker, Writer):
 
     def setup(self):
 
-        if self.inputs['ldmodel']:
-            self.limbdarkparams(self.wavebin['wavelims'][0]/10., self.wavebin['wavelims'][1]/10.)
 
         # make a list of all the aprameters you are going to fit; these are different for each wave bin so has to be don here instead of in inputs
         self.freeparamnames  = np.concatenate([self.inputs[subdir]['freeparamnames'] for subdir in self.wavebin['subdirectories']])
         self.freeparamvalues = np.concatenate([self.inputs[subdir]['freeparamvalues'] for subdir in self.wavebin['subdirectories']])
         self.freeparambounds = np.concatenate([self.inputs[subdir]['freeparambounds'] for subdir in self.wavebin['subdirectories']], 1)
+
+        # even if you want to fit for the limbdarkening parameters, they should remain fixed for now, but we'll still calculate what they should be
+        removeinds_ld = []
+        for subdir in self.wavebin['subdirectories']:
+            n = self.inputs[subdir]['n']
+            if 'u0'+n in self.freeparamnames:
+                paramind = np.argwhere(np.array(self.freeparamnames) == 'u0'+n)[0]
+                removeinds_ld.append(paramind)
+            if 'u1'+n in self.freeparamnames:
+                paramind = np.argwhere(np.array(self.freeparamnames) == 'u1'+n)[0]
+                removeinds_ld.append(paramind)
+            if self.inputs['ldlaw'] == 'nl':
+                if 'u2'+n in self.freeparamnames:
+                    paramind = np.argwhere(np.array(self.freeparamnames) == 'u2'+n)[0]
+                    removeinds_ld.append(paramind)
+                if 'u3'+n in self.freeparamnames:
+                    paramind = np.argwhere(np.array(self.freeparamnames) == 'u3'+n)[0]
+                    removeinds_ld.append(paramind)
+        self.freeparamnames = np.delete(self.freeparamnames, removeinds_ld)
+        self.freeparamvalues = np.delete(self.freeparamvalues, removeinds_ld)
+        self.freeparambounds = np.delete(self.freeparambounds, removeinds_ld, axis=1)
+
+        if len(removeinds_ld) > 0:
+        #if self.inputs['ldmodel']:
+            self.limbdarkparams(self.wavebin['wavelims'][0]/10., self.wavebin['wavelims'][1]/10.)
+
 
         # if there is only one data set in this wavebin, nothing needs to be removed
         if len(self.wavebin['subdirectories']) > 1:
@@ -111,7 +135,6 @@ class LMFitter(Talker, Writer):
                         endswithninds = np.array(np.where(endswithn)).flatten()
                         for ind in endswithninds:
                             potentialfreeparam = self.freeparamnames[ind]
-                            print(potentialfreeparam)
                             try: 
                                 lasttwo = int(potentialfreeparam[-2:]) # will work for up to 100 data sets
                                 endswithn[ind] = False
@@ -158,13 +181,15 @@ class LMFitter(Talker, Writer):
                     
                     #big bounds; recommended by Nestor; refined with some testing
                     boundlo = np.log(1e-2)
-                    boundhi = np.log(1e5)
-                    metric = 10
+                    boundhi = np.log(1e3)
+                    metric = 0.1
 
                     if kerneltype == 'ExpSquaredKernel':
                         k = kernels.ExpSquaredKernel(metric, ndim=nregressors, axes=i)
                     if kerneltype == 'Matern32Kernel':
                         k = kernels.Matern32Kernel(metric, ndim=nregressors, axes=i)
+                    if kerneltype == 'ExpKernel':
+                        k = kernels.ExpKernel(metric, ndim=nregressors, axes=i)
 
                     if i == 0: fitkernel = k
                     else: fitkernel += k
@@ -588,6 +613,7 @@ class LMFitter(Talker, Writer):
             np.save(self.inputs['directoryname']+'dividewhite.npy', self.dividewhite)
 
     def limbdarkparams(self, wavestart, waveend):
+
         self.speak('using ldtk to derive limb darkening parameters')
         filters = BoxcarFilter('a', wavestart, waveend),     # Define passbands - Boxcar filters for transmission spectroscopy
         sc = LDPSetCreator(teff=(self.inputs['Teff'], self.inputs['Teff_unc']),             # Define your star, and the code
@@ -611,35 +637,60 @@ class LMFitter(Talker, Writer):
             chains = np.array(ps._samples['lg'])
             u0_array = chains[:,:,0]
             u1_array = chains[:,:,1]
+        elif self.inputs['ldlaw'] == 'nl':
+            u, u_unc = ps.coeffs_nl(do_mc=True)
+            chains = np.array(ps._samples['nl'])
+            u0_array = chains[:,:,0]
+            u1_array = chains[:,:,1]           
+            u2_array = chains[:,:,2]
+            u3_array = chains[:,:,3]
         else: 
             self.speak('unknown limb-darkening law!')
             return
         self.write('limb darkening params, {} law: {} +/- {},   {} +/- {} '.format(self.inputs['ldlaw'], u[0][0], u_unc[0][0], u[0][1], u_unc[0][1]))
 
         # re-parameterize the limb darkening parameters according to Kipping+ (2013)
-        if self.inputs['ldlaw'] == 'sq':
-            self.q0_array = (u0_array + u1_array)**2
-            self.q1_array = u1_array/(2*(u0_array + u1_array))
-        elif self.inputs['ldlaw'] == 'qd':
-            self.q0_array = (u0_array + u1_array)**2
-            self.q1_array = u0_array/(2*(u0_array + u1_array))
-        elif self.inputs['ldlaw'] == 'lg':
-            self.q0_array = (1 - u1_array)**2
-            self.q1_array = (1 - u0_array)/(1 - u1_array)
-        self.q0, self.q1 = np.mean(self.q0_array), np.mean(self.q1_array)
-        self.q0_unc, self.q1_unc = np.std(self.q0_array), np.std(self.q1_array)
-        self.write('re-parameterized limb darkening params: {} +/- {},    {} +/- {}'.format(self.q0, self.q0_unc, self.q1, self.q1_unc))
+        if self.inputs['ldlaw'] in ['sq', 'qd', 'lg']:
+            if self.inputs['ldlaw'] == 'sq':
+                self.q0_array = (u0_array + u1_array)**2
+                self.q1_array = u1_array/(2*(u0_array + u1_array))
+            elif self.inputs['ldlaw'] == 'qd':
+                self.q0_array = (u0_array + u1_array)**2
+                self.q1_array = u0_array/(2*(u0_array + u1_array))
+            elif self.inputs['ldlaw'] == 'lg':
+                self.q0_array = (1 - u1_array)**2
+                self.q1_array = (1 - u0_array)/(1 - u1_array)
+            self.q0, self.q1 = np.mean(self.q0_array), np.mean(self.q1_array)
+            self.q0_unc, self.q1_unc = np.std(self.q0_array), np.std(self.q1_array)
+            self.write('re-parameterized limb darkening params: {} +/- {},    {} +/- {}'.format(self.q0, self.q0_unc, self.q1, self.q1_unc))
 
-        # save the re-parameterized limb_darkening values so that they can be recalled when making the model
-        self.wavebin['ldparams'] = {}
-        self.wavebin['ldparams']['q0'] = self.q0
-        self.wavebin['ldparams']['q1'] = self.q1
-        self.wavebin['ldparams']['q0_unc'] = self.q0_unc
-        self.wavebin['ldparams']['q1_unc'] = self.q1_unc
+            # save the re-parameterized limb_darkening values so that they can be recalled when making the model
+            self.wavebin['ldparams'] = {}
+            self.wavebin['ldparams']['q0'] = self.q0
+            self.wavebin['ldparams']['q1'] = self.q1
+            self.wavebin['ldparams']['q0_unc'] = self.q0_unc
+            self.wavebin['ldparams']['q1_unc'] = self.q1_unc
 
-        for subdir in self.wavebin['subdirectories']:
-            self.inputs[subdir]['tranparams'][-2], self.inputs[subdir]['tranparams'][-1] = self.q0, self.q1
-            self.inputs[subdir]['tranbounds'][0][-2], self.inputs[subdir]['tranbounds'][0][-1] = 0.01, 0.01
-            self.inputs[subdir]['tranbounds'][1][-2], self.inputs[subdir]['tranbounds'][1][-1] = 0.99, 0.99
-            
+        elif self.inputs['ldlaw'] == 'nl':
+            self.q0, self.q1, self.q2, self.q3 = np.mean(u0_array), np.mean(u1_array), np.mean(u2_array), np.mean(u3_array)
+            self.q0_unc, self.q1_unc, self.q2_unc, self.q3_unc = np.std(u0_array), np.std(u1_array), np.std(u2_array), np.std(u3_array)
+
+            self.wavebin['ldparams'] = {}
+            self.wavebin['ldparams']['q0'] = self.q0
+            self.wavebin['ldparams']['q1'] = self.q1
+            self.wavebin['ldparams']['q2'] = self.q2
+            self.wavebin['ldparams']['q3'] = self.q3
+            self.wavebin['ldparams']['q0_unc'] = self.q0_unc
+            self.wavebin['ldparams']['q1_unc'] = self.q1_unc
+            self.wavebin['ldparams']['q2_unc'] = self.q2_unc
+            self.wavebin['ldparams']['q3_unc'] = self.q3_unc            
+
+        #for subdir in self.wavebin['subdirectories']:
+        #    replace_index = len(u[0])
+        #    while replace_index > 0:
+        #        self.inputs[subdir]['tranparams'][-replace_index] = self.q0
+        #        self.inputs[subdir]['tranbounds'][0][-replace_index] = 0.01
+        #        self.inputs[subdir]['tranbounds'][1][-replace_index] = 0.99
+        #        replace_index -= 1
+
 

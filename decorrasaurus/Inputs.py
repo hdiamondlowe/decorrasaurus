@@ -157,6 +157,9 @@ class Inputs(Talker):
             return
 
         inputs['tranlabels']      = dictionary['tranlabels']
+        if self.inputs['ldlaw'] in ['qd', 'sq', 'lg']: assert('u3' not in inputs['tranlabels']), 'Check limb darkening law with number of ld parameters'
+        elif self.inputs['ldlaw'] == 'nl': assert('u3' in inputs['tranlabels']), 'Check limb darkening law with number of ld parameters'
+
         inputs['tranparams']      = [str_to_bool(i) for i in dictionary['tranparams']]
         inputs['tranbounds']      = [[str_to_bool(i) for i in dictionary['tranbounds_low']], [str_to_bool(i) for i in dictionary['tranbounds_high']]]
         inputs['wavelength_lims'] = [float(i) for i in dictionary['wavelength_lims']]
@@ -214,6 +217,8 @@ class Inputs(Talker):
             self.inputs['binlen']      = str_to_bool(dictionary['binlen'])
             self.inputs['timesTdur']   = float(dictionary['timesTdur'])
 
+        #try: inputs['wave_gap'] = str_to_bool(dictionary['wave_gap'])
+        #except(TypeError): inputs['wave_gap'] = [int(i) for i in dictionary['wave_gap']]
 
         try: inputs['midclip_inds'] = str_to_bool(dictionary['midclip_inds'])
         except(TypeError): inputs['midclip_inds'] = [int(i) for i in dictionary['midclip_inds']]
